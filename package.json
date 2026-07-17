@@ -1,0 +1,40 @@
+{
+  "name": "numdux-notebook",
+  "version": "0.2.0",
+  "private": true,
+  "bin": {
+    "numdux": "./numdux"
+  },
+  "type": "module",
+  "scripts": {
+    "numdux": "python3 -m backend.app.cli",
+    "start": "python3 -m backend.app.cli run",
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "@tanstack/react-query": "^5.51.1",
+    "@tanstack/react-table": "^8.19.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.3.19",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-resizable-panels": "^2.0.20",
+    "recharts": "^2.12.7",
+    "tailwind-merge": "^2.4.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}

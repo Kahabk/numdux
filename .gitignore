@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.numdux_data/
+.numdux_test/
+.env
+tsconfig.tsbuildinfo
+__pycache__/
+*.pyc
