@@ -35,7 +35,16 @@ export const useNotebookStore = create<NotebookState>((set) => ({
     })),
   setRun: (run) => set({ run }),
   setInstruction: (instruction) => set({ instruction }),
-  addVersion: (version) => set((state) => ({ versions: [...state.versions, version] })),
+  addVersion: (version) =>
+    set((state) => ({
+      versions: [...state.versions, version],
+      dataset: state.dataset ? { ...state.dataset, versions: [...state.dataset.versions, version] } : state.dataset,
+      datasets: state.datasets.map((item) =>
+        state.dataset && item.dataset_id === state.dataset.dataset_id
+          ? { ...item, versions: [...item.versions, version] }
+          : item
+      )
+    })),
   removeDataset: (datasetId) =>
     set((state) => {
       const datasets = state.datasets.filter((item) => item.dataset_id !== datasetId);

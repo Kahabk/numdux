@@ -18,6 +18,8 @@ export function VisualReport({ report, pdfUrl, onRefresh, theme, onToggleTheme }
 
         {report.charts[4] && <section className="report-section"><ReportChart chart={report.charts[4]} full /></section>}
 
+        {report.charts.length > 5 && <section className="report-section"><div className="report-section-heading"><div><h2>Graph Studio charts</h2><p>Saved charts attached to this dataset version.</p></div></div><div className="report-grid-two">{report.charts.slice(5).map((chart) => <ReportChart key={chart.id} chart={chart} />)}</div></section>}
+
         <section className="report-section report-column-section"><div className="report-section-heading"><div><h2>Column dictionary</h2><p>Profiled types, completeness, distribution summaries, and recommended actions.</p></div></div><div className="report-table-wrap"><table className="report-table"><thead><tr><th>Column</th><th>Type</th><th>Missing</th><th>Unique</th><th>Range / mean</th><th>Issue</th><th>Suggested action</th></tr></thead><tbody>{report.columns.map((column) => <tr key={String(column.name)}><td>{String(column.name)}</td><td>{String(column.type)}</td><td>{String(column.null_count)} ({String(column.null_percentage)}%)</td><td>{String(column.unique_count)}</td><td>{column.mean == null ? `${String(column.minimum ?? "-")} - ${String(column.maximum ?? "-")}` : `${String(column.minimum ?? "-")} - ${String(column.maximum ?? "-")} / ${String(column.mean)}`}</td><td>{String(column.issue ?? "None")}</td><td>{String(column.suggested_action ?? "No action required")}</td></tr>)}</tbody></table></div></section>
 
         <section className="report-recommendation"><AlertTriangle className="h-5 w-5" /><div><strong>Recommended next step</strong><p>{report.analysis.recommendation}</p></div></section>

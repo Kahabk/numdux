@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 import uuid
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
 from .ai import GeminiAIProvider, RuleBasedAIProvider, SYSTEM_PROMPT
 from .config import get_settings, update_env_file
-from .models import AppSettingsUpdate, CleaningInstruction, CleaningPlan, CleaningRunResponse, CustomExecutionInstruction, ExecutionResult, GeneratedCode, SandboxRepairAttempt, SandboxTaskInstruction, SandboxTaskResponse, SqlExecutionInstruction
+from .charts import ChartConfigStore, query_dataframe
+from .modeling import ModelRunStore, train_model_in_sandbox
+from .models import AppSettingsUpdate, ChartConfigCreate, ChartFilter, CleaningInstruction, CleaningPlan, CleaningRunResponse, CustomExecutionInstruction, ExecutionResult, GeneratedCode, ModelTrainingRequest, SandboxRepairAttempt, SandboxTaskInstruction, SandboxTaskResponse, SqlExecutionInstruction
 from .profiler import load_dataset, profile_dataset
 from .reporting import build_report, report_pdf
 from .safety import validate_python_code
@@ -24,6 +27,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STORAGE = ROOT / ".numdux_data"
 store = InMemoryStore(STORAGE)
 store.load_existing({"load": load_dataset, "profile": profile_dataset})
+chart_store = ChartConfigStore(STORAGE)
+model_store = ModelRunStore(STORAGE)
 run_dirs: dict[str, Path] = {}
 REPORTS = STORAGE / "reports"
 
@@ -132,6 +137,8 @@ def delete_dataset(dataset_id: str, confirm: str = "DELETE") -> dict[str, Any]:
 
             shutil.rmtree(run_dir)
     store.delete_dataset(dataset_id)
+    chart_store.delete_dataset(dataset_id)
+    model_store.delete_dataset(dataset_id)
     report_dir = REPORTS / dataset_id
     if report_dir.exists():
         import shutil
@@ -169,6 +176,8 @@ def delete_storage(confirm: str) -> dict[str, Any]:
     if confirm != "DELETE":
         raise HTTPException(status_code=400, detail='Type DELETE to confirm deleting all stored datasets, reports, and run outputs.')
     store.clear_all()
+    chart_store.clear_all()
+    model_store.clear_all()
     run_dirs.clear()
     REPORTS.mkdir(parents=True, exist_ok=True)
     return {"status": "deleted", "datasets": 0}
@@ -191,6 +200,100 @@ def dataset_version(dataset_id: str, version_id: str) -> dict[str, Any]:
     return serialize_dataset(record, get_version(record, version_id))
 
 
+@app.get("/api/datasets/{dataset_id}/versions/{version_id}/query")
+def dataset_version_query(
+    dataset_id: str,
+    version_id: str,
+    groupby: list[str] = Query(default=[]),
+    agg: str = "count",
+    value_field: str | None = None,
+    filters: str = "[]",
+    limit: int = 500,
+) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    record = store.get(dataset_id)
+    version = get_version(record, version_id)
+    try:
+        parsed_filters = [ChartFilter.model_validate(item) for item in json.loads(filters or "[]")]
+        dataframe = load_dataset(version.path.read_bytes(), version.path.name)
+        result = query_dataframe(dataframe, dataset_id, version.id, groupby, agg, value_field, parsed_filters, limit)
+        return result.model_dump()
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="filters must be a JSON array.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Dataset query failed: {exc}") from exc
+
+
+@app.post("/api/datasets/{dataset_id}/versions/{version_id}/train")
+def train_dataset_model(dataset_id: str, version_id: str, request: ModelTrainingRequest) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    record = store.get(dataset_id)
+    version = get_version(record, version_id)
+    columns = [column.name for column in version.profile.column_metadata]
+    try:
+        model_run, run_dir = train_model_in_sandbox(STORAGE, version.path, dataset_id, version.id, request, columns)
+        saved = model_store.save(model_run, run_dir) if run_dir else model_run
+        return saved.model_dump()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Model training failed: {exc}") from exc
+
+
+@app.get("/api/datasets/{dataset_id}/models")
+def list_model_runs(dataset_id: str) -> list[dict[str, Any]]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return [item.model_dump() for item in model_store.list(dataset_id)]
+
+
+@app.get("/api/datasets/{dataset_id}/models/{run_id}")
+def get_model_run(dataset_id: str, run_id: str) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    model_run = model_store.get(dataset_id, run_id)
+    if not model_run:
+        raise HTTPException(status_code=404, detail="Model run not found")
+    return model_run.model_dump()
+
+
+@app.get("/api/datasets/{dataset_id}/charts")
+def list_chart_configs(dataset_id: str) -> list[dict[str, Any]]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return [chart.model_dump() for chart in chart_store.list(dataset_id)]
+
+
+@app.post("/api/datasets/{dataset_id}/charts")
+def create_chart_config(dataset_id: str, request: ChartConfigCreate) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    get_version(store.get(dataset_id), request.version_id)
+    try:
+        return chart_store.create(dataset_id, request).model_dump()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Chart config could not be saved: {exc}") from exc
+
+
+@app.get("/api/datasets/{dataset_id}/charts/{chart_id}")
+def get_chart_config(dataset_id: str, chart_id: str) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    chart = chart_store.get(dataset_id, chart_id)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart config not found")
+    return chart.model_dump()
+
+
+@app.delete("/api/datasets/{dataset_id}/charts/{chart_id}")
+def delete_chart_config(dataset_id: str, chart_id: str) -> dict[str, str]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    if not chart_store.delete(dataset_id, chart_id):
+        raise HTTPException(status_code=404, detail="Chart config not found")
+    return {"status": "deleted", "chart_id": chart_id}
+
+
 @app.get("/api/datasets/{dataset_id}/report")
 def dataset_report(dataset_id: str, run_id: str | None = None, version_id: str | None = None, theme: str = "light") -> dict[str, Any]:
     if dataset_id not in store.datasets:
@@ -203,6 +306,7 @@ def dataset_report(dataset_id: str, run_id: str | None = None, version_id: str |
         run.model_dump() if run else None,
         REPORTS / dataset_id / version.id / ("dark" if theme == "dark" else "light"),
         theme,
+        saved_charts=report_saved_charts(record, version),
     )
     for chart in report.get("charts", []):
         chart["url"] = f"/api/reports/{dataset_id}/{version.id}/{report['theme']}/assets/{chart['file']}"
@@ -427,6 +531,29 @@ def approve_run(run_id: str, dataset_id: str) -> dict[str, Any]:
     return {"status": "approved", "version": serialize_version(version)}
 
 
+@app.post("/api/sandbox-tasks/{task_id}/approve")
+def approve_sandbox_task(task_id: str, dataset_id: str) -> dict[str, Any]:
+    if dataset_id not in store.datasets:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    if task_id not in run_dirs:
+        raise HTTPException(status_code=404, detail="Task output not found")
+    version = store.approve_run(dataset_id, task_id, run_dirs[task_id], {"profile": profile_dataset})
+    return {"status": "approved", "version": serialize_version(version)}
+
+
+@app.get("/api/sandbox-tasks/{task_id}/files/{filename}")
+def sandbox_task_file(task_id: str, filename: str) -> FileResponse:
+    if Path(filename).name != filename:
+        raise HTTPException(status_code=400, detail="Invalid task asset path")
+    run_dir = run_dirs.get(task_id)
+    if not run_dir:
+        raise HTTPException(status_code=404, detail="Task output not found")
+    output = run_dir / "output" / filename
+    if not output.exists() or not output.is_file():
+        raise HTTPException(status_code=404, detail="Task file not found")
+    return FileResponse(output, filename=filename)
+
+
 @app.get("/api/datasets/{dataset_id}/export")
 def export_current(dataset_id: str, version_id: str | None = None) -> FileResponse:
     if dataset_id not in store.datasets:
@@ -464,6 +591,46 @@ def serialize_dataset(record, version=None) -> dict[str, Any]:
         "profile": version.profile.model_dump(),
         "versions": [serialize_version(v) for v in record.versions],
     }
+
+
+def report_saved_charts(record, version) -> list[dict[str, Any]]:
+    configs = [chart for chart in chart_store.list(record.id) if chart.version_id == version.id]
+    if not configs:
+        return []
+    profile = version.profile.model_dump()
+    dataframe: pd.DataFrame | None = None
+    charts: list[dict[str, Any]] = []
+    for chart in configs:
+        data: list[dict[str, Any]] = []
+        if chart.chart_type == "missingness":
+            data = [{"column": item["column"], "value": item["percent"]} for item in profile.get("missingness_chart", [])[:30]]
+        elif chart.chart_type == "heatmap":
+            correlations = profile.get("pearson_correlation", {})
+            data = [
+                {"x": left, "y": right, "value": value}
+                for left, values in correlations.items()
+                for right, value in values.items()
+                if value is not None
+            ][:100]
+        else:
+            if dataframe is None:
+                dataframe = load_dataset(version.path.read_bytes(), version.path.name)
+            try:
+                result = query_dataframe(
+                    dataframe,
+                    record.id,
+                    version.id,
+                    chart.groupby or ([chart.x_field] if chart.x_field else []),
+                    chart.agg,
+                    chart.y_field,
+                    chart.filters,
+                    100,
+                )
+                data = result.data
+            except Exception:
+                data = []
+        charts.append({**chart.model_dump(), "data": data})
+    return charts
 
 
 def build_comparison(original: dict[str, Any], cleaned: dict[str, Any], validation: dict[str, Any]) -> dict[str, Any]:

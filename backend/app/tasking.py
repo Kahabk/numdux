@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from textwrap import dedent
 from typing import Any
 
@@ -9,13 +10,18 @@ from .models import GeneratedCode
 
 def infer_workflow(instruction: str) -> list[str]:
     text = instruction.lower()
-    workflow = ["load_local_dataset", "clean_and_preprocess", "validate_outputs"]
+    only_filter = "only" in text and "filter" in text and not any(token in text for token in ["clean", "train", "model"])
+    only_train = "only" in text and any(token in text for token in ["train", "model"]) and "clean" not in text and "filter" not in text
+    workflow = ["load_local_dataset"]
+    if not only_train:
+        workflow.append("filter_rows" if "filter" in text else "clean_and_preprocess")
     if any(token in text for token in ["feature", "engineer", "encoding", "encode"]):
-        workflow.insert(2, "feature_engineering")
+        workflow.append("feature_engineering")
     if any(token in text for token in ["train", "model", "random forest", "accuracy", "evaluate", "predict"]):
         workflow.extend(["train_model", "evaluate_model"])
     if any(token in text for token in ["predict", "prediction", "generate predictions"]):
         workflow.append("generate_predictions")
+    workflow.append("validate_outputs")
     return list(dict.fromkeys(workflow))
 
 
@@ -27,6 +33,7 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
         "instruction": instruction,
         "workflow": workflow,
         "target_hint": _target_hint(instruction, metadata),
+        "filter_hint": _filter_hint(instruction, metadata),
         "wants_model": wants_model,
         "wants_features": wants_features,
     }
@@ -76,26 +83,58 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
         def record(name, detail):
             steps.append({{"step": name, "detail": detail, "timestamp": datetime.utcnow().isoformat() + "Z"}})
 
-        if before_duplicates:
+        filter_hint = TASK.get("filter_hint") or {{}}
+        if filter_hint.get("column") in df.columns:
+            column = filter_hint["column"]
+            before_filter = int(len(df))
+            value = filter_hint.get("value")
+            op = filter_hint.get("op")
+            series = df[column]
+            numeric_series = pd.to_numeric(series, errors="coerce")
+            numeric_value = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+            if op in [">", ">=", "<", "<="] and pd.notna(numeric_value):
+                if op == ">":
+                    df = df[numeric_series > numeric_value]
+                elif op == ">=":
+                    df = df[numeric_series >= numeric_value]
+                elif op == "<":
+                    df = df[numeric_series < numeric_value]
+                elif op == "<=":
+                    df = df[numeric_series <= numeric_value]
+            elif op in ["=", "=="]:
+                df = df[series.astype(str).str.lower() == str(value).lower()]
+            elif op == "contains":
+                df = df[series.astype(str).str.contains(str(value), case=False, na=False)]
+            df = df.reset_index(drop=True)
+            record("filter_rows", {{"column": column, "op": op, "value": value, "rows_before": before_filter, "rows_after": int(len(df))}})
+
+        if "clean_and_preprocess" in TASK["workflow"] and before_duplicates:
             df = df.drop_duplicates().reset_index(drop=True)
             record("remove_duplicates", {{"rows_removed": before_duplicates}})
 
-        for column in list(df.columns):
-            series = df[column]
-            if series.dtype == object or str(series.dtype).startswith("string"):
-                cleaned = series.astype("string").str.strip()
-                cleaned = cleaned.replace({{"": pd.NA, "na": pd.NA, "n/a": pd.NA, "null": pd.NA, "none": pd.NA}})
-                df[column] = cleaned
-            numeric = pd.to_numeric(df[column], errors="coerce")
-            if len(df) and numeric.notna().mean() > 0.85:
-                median = numeric.median()
-                df[column] = numeric.fillna(median if pd.notna(median) else 0)
-            elif df[column].isna().any():
-                mode = df[column].mode(dropna=True)
-                df[column] = df[column].fillna(mode.iloc[0] if not mode.empty else "unknown")
-        record("clean_and_preprocess", {{"rows": int(df.shape[0]), "columns": int(df.shape[1])}})
+        if "clean_and_preprocess" in TASK["workflow"]:
+            for column in list(df.columns):
+                series = df[column]
+                if series.dtype == object or str(series.dtype).startswith("string"):
+                    cleaned = series.astype("string").str.strip()
+                    cleaned = cleaned.replace({{"": pd.NA, "na": pd.NA, "n/a": pd.NA, "null": pd.NA, "none": pd.NA}})
+                    df[column] = cleaned
+                numeric = pd.to_numeric(df[column], errors="coerce")
+                if len(df) and numeric.notna().mean() > 0.85:
+                    median = numeric.median()
+                    df[column] = numeric.fillna(median if pd.notna(median) else 0)
+                elif df[column].isna().any():
+                    mode = df[column].mode(dropna=True)
+                    df[column] = df[column].fillna(mode.iloc[0] if not mode.empty else "unknown")
+            record("clean_and_preprocess", {{"rows": int(df.shape[0]), "columns": int(df.shape[1])}})
 
         feature_frame = df.copy()
+        target = TASK.get("target_hint")
+        if TASK["wants_model"] and target not in df.columns:
+            candidates = [c for c in df.columns if 1 < df[c].nunique(dropna=True) <= max(20, int(len(df) * 0.5))]
+            target = candidates[-1] if candidates else df.columns[-1] if len(df.columns) else None
+        if target in feature_frame.columns:
+            feature_frame = feature_frame.drop(columns=[target])
         if TASK["wants_features"]:
             for column in feature_frame.select_dtypes(include=["object", "string", "category"]).columns:
                 if feature_frame[column].nunique(dropna=True) <= 30:
@@ -108,14 +147,11 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
 
         model_result = {{"status": "not_requested"}}
         predictions_rows = []
-        target = TASK.get("target_hint")
-        if TASK["wants_model"] and len(df) >= 5:
-            if target not in df.columns:
-                candidates = [c for c in df.columns if 1 < df[c].nunique(dropna=True) <= max(20, int(len(df) * 0.5))]
-                target = candidates[-1] if candidates else df.columns[-1]
+        if TASK["wants_model"] and target in df.columns and len(df) >= 5:
             y = df[target]
-            X = feature_frame.drop(columns=[target], errors="ignore")
-            X = X.select_dtypes(include=[np.number]).replace([np.inf, -np.inf], np.nan).fillna(0)
+            X = feature_frame.select_dtypes(include=[np.number]).replace([np.inf, -np.inf], np.nan).fillna(0)
+            if X.shape[1] == 0:
+                X = pd.DataFrame({{"row_number": np.arange(len(df))}})
             try:
                 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
                 from sklearn.metrics import accuracy_score, mean_absolute_error, r2_score
@@ -135,11 +171,15 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                 else:
                     metrics = {{"mae": float(mean_absolute_error(y_test, pred)), "r2": float(r2_score(y_test, pred))}}
                 predictions_rows = pd.DataFrame({{"actual": y_test.reset_index(drop=True), "prediction": pred}}).head(100).to_dict(orient="records")
-                model_result = {{"status": "success", "target": str(target), "model": model.__class__.__name__, "rows_train": int(len(X_train)), "rows_test": int(len(X_test)), "metrics": metrics}}
+                importances = sorted(zip([str(c) for c in X.columns], model.feature_importances_), key=lambda item: item[1], reverse=True)[:12]
+                model_result = {{"status": "success", "target": str(target), "model": model.__class__.__name__, "rows_train": int(len(X_train)), "rows_test": int(len(X_test)), "metrics": metrics, "feature_importance": [{{"feature": name, "importance": float(score)}} for name, score in importances], "predictions_preview": predictions_rows[:20]}}
                 record("train_evaluate_model", model_result)
             except Exception as exc:
                 model_result = {{"status": "failed", "target": str(target), "error": str(exc)}}
                 record("model_error", model_result)
+        elif TASK["wants_model"]:
+            model_result = {{"status": "failed", "error": "Need at least 5 rows and a target column to train a Random Forest model.", "target": str(target)}}
+            record("model_error", model_result)
 
         cleaned_path = OUTPUT_DIR / "cleaned.parquet"
         df.to_parquet(cleaned_path, index=False)
@@ -206,3 +246,19 @@ def _target_hint(instruction: str, metadata: dict[str, Any]) -> str | None:
             return name
     columns = metadata.get("column_metadata", [])
     return str(columns[-1].get("name")) if columns else None
+
+
+def _filter_hint(instruction: str, metadata: dict[str, Any]) -> dict[str, Any] | None:
+    lowered = instruction.lower()
+    if "filter" not in lowered and "where" not in lowered:
+        return None
+    columns = [str(column.get("name", "")) for column in metadata.get("column_metadata", [])]
+    for column in sorted(columns, key=len, reverse=True):
+        escaped = re.escape(column)
+        match = re.search(rf"{escaped}\s*(>=|<=|==|=|>|<)\s*['\"]?([^,'\"\n]+)['\"]?", instruction, flags=re.IGNORECASE)
+        if match:
+            return {"column": column, "op": match.group(1), "value": match.group(2).strip()}
+        contains = re.search(rf"{escaped}\s+contains\s+['\"]?([^,'\"\n]+)['\"]?", instruction, flags=re.IGNORECASE)
+        if contains:
+            return {"column": column, "op": "contains", "value": contains.group(1).strip()}
+    return None

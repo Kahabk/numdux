@@ -43,7 +43,7 @@ REPORT_DARK_COLORS = {
 }
 
 
-def build_report(dataset: dict[str, Any], run: dict[str, Any] | None = None, artifact_dir: Path | None = None, theme: str = "light") -> dict[str, Any]:
+def build_report(dataset: dict[str, Any], run: dict[str, Any] | None = None, artifact_dir: Path | None = None, theme: str = "light", saved_charts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     theme = "dark" if theme == "dark" else "light"
     profile = dataset["profile"]
     columns = profile.get("column_metadata", [])
@@ -96,6 +96,8 @@ def build_report(dataset: dict[str, Any], run: dict[str, Any] | None = None, art
     if artifact_dir:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         report["charts"] = generate_chart_artifacts(profile, findings, artifact_dir, theme)
+        if saved_charts:
+            report["charts"].extend(generate_saved_chart_artifacts(saved_charts, artifact_dir, theme))
         report["artifact_dir"] = str(artifact_dir)
     return _json_safe(report)
 
@@ -136,6 +138,46 @@ def generate_chart_artifacts(profile: dict[str, Any], findings: list[dict[str, A
     return charts
 
 
+def generate_saved_chart_artifacts(saved_charts: list[dict[str, Any]], artifact_dir: Path, theme: str) -> list[dict[str, Any]]:
+    colors = _colors(theme)
+    charts: list[dict[str, Any]] = []
+    for index, chart in enumerate(saved_charts[:8], start=1):
+        rows = chart.get("data", [])
+        if not rows:
+            continue
+        title = chart.get("title") or f"Saved chart {index}"
+        chart_type = chart.get("chart_type", "bar")
+        x_field = chart.get("x_field") or (chart.get("groupby") or [None])[0] or "metric"
+        y_field = chart.get("y_field") or "value"
+        filename = f"saved-chart-{index}.png"
+        path = artifact_dir / filename
+        fig, axis = plt.subplots(figsize=(8.8, 4.8), dpi=300)
+        fig.patch.set_facecolor(colors.get("page", "white"))
+        axis.set_facecolor(colors.get("page", "white"))
+        x_values = [str(row.get(x_field, row.get("metric", index))) for index, row in enumerate(rows)]
+        y_values = [_finite_float(row.get(y_field, row.get("value")), 0.0) for row in rows]
+        if chart_type == "scatter":
+            axis.scatter(range(len(y_values)), y_values, color=colors["accent"], s=22)
+            axis.set_xticks(range(len(x_values)))
+            axis.set_xticklabels(x_values, rotation=30, ha="right")
+        elif chart_type == "line":
+            axis.plot(x_values, y_values, color=colors["accent"], marker="o", linewidth=1.8)
+            axis.tick_params(axis="x", rotation=30)
+        else:
+            axis.bar(x_values, y_values, color=colors["accent"])
+            axis.tick_params(axis="x", rotation=30)
+        axis.set_title(title, loc="left", fontsize=13, fontweight="bold", color=colors["ink"], pad=14)
+        axis.set_ylabel(str(y_field), color=colors["muted"])
+        axis.grid(axis="y", alpha=0.2, color=colors["muted"])
+        axis.spines[["top", "right"]].set_visible(False)
+        axis.tick_params(colors=colors["muted"], labelsize=9)
+        fig.tight_layout()
+        fig.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        charts.append({"id": path.stem, "title": title, "type": chart_type, "file": filename, "objective": "Saved Graph Studio chart", "dpi": 300, "width": 8.8, "height": 4.8})
+    return charts
+
+
 def _save_bar_chart(directory: Path, filename: str, title: str, labels: list[str], values: list[float], y_label: str, objective: str, horizontal: bool = False, color: str = "#4e6ed9", rotate: bool = False, theme: str = "light") -> dict[str, Any]:
     colors = _colors(theme)
     path = directory / filename
@@ -165,6 +207,8 @@ def report_pdf(report: dict[str, Any]) -> bytes:
     buffer = BytesIO()
     with PdfPages(buffer) as pdf:
         _pdf_overview_page(pdf, report)
+        if len(report.get("charts", [])) > 5:
+            _pdf_graph_studio_page(pdf, report)
         _pdf_dictionary_page(pdf, report)
     return buffer.getvalue()
 
@@ -222,6 +266,25 @@ def _pdf_dictionary_page(pdf: PdfPages, report: dict[str, Any]) -> None:
         else: cell.set_facecolor(colors.get("page", "white"))
         cell.get_text().set_color(colors["ink"] if row else colors.get("page", "white"))
     figure.text(0.07, 0.025, "Numdux visual data-quality report  |  Page 2", fontsize=7, color=colors["muted"])
+    pdf.savefig(figure, bbox_inches="tight")
+    plt.close(figure)
+
+
+def _pdf_graph_studio_page(pdf: PdfPages, report: dict[str, Any]) -> None:
+    colors = _colors(report.get("theme", "light"))
+    figure = plt.figure(figsize=(11.69, 8.27), facecolor=colors.get("page", "white"))
+    figure.text(0.06, 0.94, "Graph Studio charts", fontsize=18, fontweight="bold", color=colors["ink"])
+    figure.text(0.06, 0.91, "Saved charts attached to this dataset version.", fontsize=9, color=colors["muted"])
+    charts = report.get("charts", [])[5:11]
+    for index, chart in enumerate(charts):
+        col, row = index % 3, index // 3
+        axis = figure.add_axes([0.06 + col * 0.31, 0.52 - row * 0.35, 0.28, 0.28])
+        image_path = Path(report.get("artifact_dir", "")) / chart["file"]
+        if image_path.exists():
+            axis.imshow(plt.imread(image_path))
+        axis.set_axis_off()
+        axis.set_title(chart["title"], loc="left", fontsize=8, color=colors["ink"], pad=4)
+    figure.text(0.06, 0.025, "Numdux visual data-quality report  |  Graph Studio", fontsize=7, color=colors["muted"])
     pdf.savefig(figure, bbox_inches="tight")
     plt.close(figure)
 

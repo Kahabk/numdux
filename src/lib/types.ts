@@ -38,6 +38,9 @@ export type DatasetProfile = {
   column_metadata: ColumnProfile[];
   detected_problems: string[];
   sample_rows: Record<string, unknown>[];
+  pearson_correlation: Record<string, Record<string, number | null>>;
+  spearman_correlation: Record<string, Record<string, number | null>>;
+  covariance_matrix: Record<string, Record<string, number | null>>;
   missingness_chart: Array<{ column: string; nulls: number; percent: number }>;
   numeric_distributions: Array<{ column: string; bins: Array<{ label: string; count: number }> }>;
   category_distributions: Array<{ column: string; values: Array<{ label: string; count: number }> }>;
@@ -76,6 +79,62 @@ export type UploadResponse = {
 };
 
 export type DatasetRecord = UploadResponse;
+
+export type ChartType = "histogram" | "bar" | "line" | "scatter" | "box" | "heatmap" | "missingness";
+export type ChartAgg = "count" | "sum" | "mean" | "min" | "max";
+export type ChartFilter = {
+  column: string;
+  operator: "=" | "!=" | ">" | ">=" | "<" | "<=" | "contains" | "not_contains" | "is_null" | "not_null";
+  value?: unknown;
+};
+
+export type ChartConfig = {
+  id: string;
+  dataset_id: string;
+  version_id: string;
+  chart_type: ChartType;
+  x_field: string | null;
+  y_field: string | null;
+  groupby: string[];
+  agg: ChartAgg;
+  filters: ChartFilter[];
+  title: string;
+  created_at: string;
+};
+
+export type DatasetQueryResult = {
+  dataset_id: string;
+  version_id: string;
+  rows: number;
+  columns: string[];
+  data: Record<string, unknown>[];
+};
+
+export type ModelTaskType = "auto" | "classification" | "regression";
+export type ModelType = "logistic_regression" | "linear_regression" | "random_forest" | "gradient_boosting";
+export type ModelTrainingRequest = {
+  target: string;
+  features: string[] | "auto";
+  task_type: ModelTaskType;
+  model_type: ModelType;
+  hyperparameters: Record<string, unknown>;
+};
+export type ModelRunRecord = {
+  id: string;
+  dataset_id: string;
+  version_id: string;
+  target: string;
+  features: string[];
+  task_type: "classification" | "regression";
+  model_type: ModelType;
+  hyperparameters: Record<string, unknown>;
+  metrics: Record<string, number | null>;
+  feature_importances: Array<{ feature: string; importance: number }>;
+  training_time_seconds: number;
+  created_at: string;
+  model_path: string;
+  execution?: CleaningRun["execution"] | null;
+};
 
 export type CleaningOperation = {
   id: string;

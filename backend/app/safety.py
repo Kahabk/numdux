@@ -17,6 +17,8 @@ ALLOWED_IMPORTS = {
     "pathlib",
     "math",
     "hashlib",
+    "joblib",
+    "time",
 }
 
 BLOCKED_NAMES = {"eval", "exec", "compile", "__import__", "input", "globals", "locals", "vars"}
@@ -87,4 +89,3 @@ def validate_python_code(code: str) -> list[str]:
     visitor = SafetyVisitor()
     visitor.visit(tree)
     return visitor.errors
-

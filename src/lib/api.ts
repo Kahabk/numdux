@@ -1,4 +1,4 @@
-import type { AnalysisPlan, CleaningRun, DatasetRecord, DatasetReport, SandboxTaskResult, SqlRunResult, UploadResponse } from "./types";
+import type { AnalysisPlan, ChartAgg, ChartConfig, ChartFilter, ChartType, CleaningRun, DatasetQueryResult, DatasetRecord, DatasetReport, ModelRunRecord, ModelTrainingRequest, SandboxTaskResult, SqlRunResult, UploadResponse } from "./types";
 
 type ApproveResponse = {
   status: string;
@@ -136,6 +136,77 @@ export async function runSandboxTask(datasetId: string, sandboxId: string, instr
     body: JSON.stringify({ dataset_id: datasetId, sandbox_id: sandboxId, version_id: versionId, instruction })
   });
   return parseResponse<SandboxTaskResult>(response);
+}
+
+export async function approveSandboxTask(datasetId: string, taskId: string): Promise<ApproveResponse> {
+  const response = await fetch(`/api/sandbox-tasks/${taskId}/approve?dataset_id=${datasetId}`, {
+    method: "POST"
+  });
+  return parseResponse<ApproveResponse>(response);
+}
+
+export async function queryDatasetVersion(datasetId: string, versionId: string, options: {
+  groupby: string[];
+  agg: ChartAgg;
+  value_field?: string | null;
+  filters: ChartFilter[];
+  limit: number;
+}): Promise<DatasetQueryResult> {
+  const params = new URLSearchParams();
+  options.groupby.filter(Boolean).forEach((column) => params.append("groupby", column));
+  params.set("agg", options.agg);
+  if (options.value_field) params.set("value_field", options.value_field);
+  params.set("filters", JSON.stringify(options.filters));
+  params.set("limit", String(options.limit));
+  const response = await fetch(`/api/datasets/${datasetId}/versions/${versionId}/query?${params.toString()}`);
+  return parseResponse<DatasetQueryResult>(response);
+}
+
+export async function listChartConfigs(datasetId: string): Promise<ChartConfig[]> {
+  const response = await fetch(`/api/datasets/${datasetId}/charts`);
+  return parseResponse<ChartConfig[]>(response);
+}
+
+export async function createChartConfig(datasetId: string, chart: {
+  version_id: string;
+  chart_type: ChartType;
+  x_field: string | null;
+  y_field: string | null;
+  groupby: string[];
+  agg: ChartAgg;
+  filters: ChartFilter[];
+  title: string;
+}): Promise<ChartConfig> {
+  const response = await fetch(`/api/datasets/${datasetId}/charts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(chart)
+  });
+  return parseResponse<ChartConfig>(response);
+}
+
+export async function deleteChartConfig(datasetId: string, chartId: string): Promise<{ status: string; chart_id: string }> {
+  const response = await fetch(`/api/datasets/${datasetId}/charts/${chartId}`, { method: "DELETE" });
+  return parseResponse(response);
+}
+
+export async function trainModel(datasetId: string, versionId: string, request: ModelTrainingRequest): Promise<ModelRunRecord> {
+  const response = await fetch(`/api/datasets/${datasetId}/versions/${versionId}/train`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request)
+  });
+  return parseResponse<ModelRunRecord>(response);
+}
+
+export async function listModelRuns(datasetId: string): Promise<ModelRunRecord[]> {
+  const response = await fetch(`/api/datasets/${datasetId}/models`);
+  return parseResponse<ModelRunRecord[]>(response);
+}
+
+export async function getModelRun(datasetId: string, runId: string): Promise<ModelRunRecord> {
+  const response = await fetch(`/api/datasets/${datasetId}/models/${runId}`);
+  return parseResponse<ModelRunRecord>(response);
 }
 
 export async function getDatasetReport(datasetId: string, runId?: string, versionId?: string, theme: "light" | "dark" = "light"): Promise<DatasetReport> {

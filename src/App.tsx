@@ -5,15 +5,17 @@ import { Download, FileCode2, FileText, FileUp, KeyRound, Menu, Moon, RefreshCw,
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
-import { approveRun, createAnalysisPlan, deleteAllStorage, deleteDataset, getAIProviderStatus, getAppSettings, getDatasetReport, getDatasetVersion, getHealth, listDatasets, runCleaning, runCustomCode, runSandboxTask, runSql, updateAppSettings, uploadDataset } from "./lib/api";
+import { approveRun, approveSandboxTask, createAnalysisPlan, deleteAllStorage, deleteDataset, getAIProviderStatus, getAppSettings, getDatasetReport, getDatasetVersion, getHealth, listDatasets, runCleaning, runCustomCode, runSandboxTask, runSql, updateAppSettings, uploadDataset } from "./lib/api";
 import { useNotebookStore } from "./lib/store";
 import type { AnalysisPlan, CleaningRun, DatasetRecord, DatasetReport, SandboxTaskResult, UploadResponse } from "./lib/types";
 import { formatNumber } from "./lib/utils";
 import { Cell } from "./components/Cell";
 import { DataTable } from "./components/DataTable";
+import { GraphStudio } from "./components/GraphStudio";
 import { LeftPanel } from "./components/LeftPanel";
 import { ManualNotebookCell, type ManualCellRecord } from "./components/ManualNotebookCell";
-import { DatasetActionRow, DatasetStatusRow, NotebookActionRow, type NotebookSandbox } from "./components/NotebookRows";
+import { ModelLab } from "./components/ModelLab";
+import { NotebookActionRow, type NotebookSandbox } from "./components/NotebookRows";
 import { ProfileCharts } from "./components/ProfileCharts";
 import { RightPanel } from "./components/RightPanel";
 import { VisualReport } from "./components/VisualReport";
@@ -98,6 +100,13 @@ export function App() {
       setExecutionStage(result.execution.status === "success" ? "Completed" : "Failed");
     },
     onError: () => setExecutionStage("Failed")
+  });
+  const approveTask = useMutation({
+    mutationFn: ({ taskId }: { taskId: string }) => approveSandboxTask(dataset!.dataset_id, taskId),
+    onSuccess: (payload) => {
+      addVersion(payload.version);
+      savedDatasets.refetch();
+    }
   });
   const saveSettings = useMutation({
     mutationFn: updateAppSettings,
@@ -222,6 +231,8 @@ export function App() {
       taskResults={taskResults}
       taskPendingSandboxId={sandboxTask.isPending ? sandboxTask.variables?.sandboxId : undefined}
       taskError={sandboxTask.error?.message}
+      approveTaskPendingId={approveTask.isPending ? approveTask.variables?.taskId : undefined}
+      approveTaskError={approveTask.error?.message}
       activeSandboxId={activeSandboxId}
       manualCells={manualCells}
       selectedCellId={selectedCellId}
@@ -256,6 +267,7 @@ export function App() {
         sandboxTask.mutate({ sandboxId, prompt });
         setAgentPrompt("");
       }}
+      onApproveSandboxTask={(taskId) => approveTask.mutate({ taskId })}
       onStop={() => setExecutionStage("Cancelled")}
       onRestartSandbox={restartSandbox}
     />
@@ -355,6 +367,8 @@ type NotebookProps = {
   taskResults: Record<string, SandboxTaskResult>;
   taskPendingSandboxId?: string;
   taskError?: string;
+  approveTaskPendingId?: string;
+  approveTaskError?: string;
   activeSandboxId: string;
   manualCells: ManualCellRecord[];
   selectedCellId: string | null;
@@ -386,117 +400,362 @@ type NotebookProps = {
   onRemoveManualCell: (id: string) => void;
   onRunManualCell: (cell: ManualCellRecord) => void;
   onRunSandboxTask: (sandboxId: string, prompt: string) => void;
+  onApproveSandboxTask: (taskId: string) => void;
   onStop: () => void;
   onRestartSandbox: () => void;
 };
 
 function Notebook(props: NotebookProps) {
-  const { dataset, run, code, instruction, upload, clean, executeCode, approve, healthStatus, providerStatus, isRefreshing, report, reportLoading, analysisPlan, planPending, agentPrompt, agentPending, sandboxes, taskResults, taskPendingSandboxId, taskError, activeSandboxId, manualCells, selectedCellId, executionStage, reportPreview, appTheme, reportTheme, uploadInputRef } = props;
+  const { dataset, run, code, instruction, upload, clean, executeCode, approve, healthStatus, providerStatus, isRefreshing, report, reportLoading, analysisPlan, planPending, agentPending, sandboxes, taskResults, taskError, approveTaskPendingId, approveTaskError, activeSandboxId, manualCells, selectedCellId, executionStage, reportPreview, appTheme, reportTheme, uploadInputRef } = props;
   const [openSection, setOpenSection] = useState<string | null>("dataset-status");
+  const [artifactTab, setArtifactTab] = useState<"preview" | "schema" | "issues" | "compare" | "charts" | "graph" | "model" | "export">("preview");
   const expandSection = (section: string) => {
     setOpenSection((current) => current === section ? null : section);
     window.setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   };
   const activeSandbox = sandboxes.find((sandbox) => sandbox.id === activeSandboxId);
   const selectedManualCell = manualCells.find((cell) => cell.id === selectedCellId);
+  const taskList = Object.values(taskResults);
+  const activeTask = taskResults[activeSandboxId] ?? (taskList.length ? taskList[taskList.length - 1] : undefined);
   const reportPdfUrl = dataset ? `/api/datasets/${dataset.dataset_id}/report.pdf?version_id=${dataset.profile.version_id}&theme=${reportTheme}${run ? `&run_id=${run.run_id}` : ""}` : "";
   return (
     <main className="notebook-main h-full overflow-auto bg-notebook">
       <NotebookHeader theme={appTheme} onToggleTheme={props.onToggleAppTheme} />
-      <NotebookActionRow dataset={dataset} versions={dataset?.versions ?? []} activeVersionId={dataset?.profile.version_id} sandboxId={activeSandboxId} sandboxes={sandboxes} onVersionChange={props.onVersionChange} onSandboxChange={props.onSandboxChange} onUpload={() => uploadInputRef.current?.click()} onCreateSandbox={props.onCreateSandbox} onAddCell={props.onAddManualCell} onRun={() => selectedManualCell ? props.onRunManualCell(selectedManualCell) : props.onRunCode()} onStop={props.onStop} onRestart={props.onRestartSandbox} onAskAI={() => expandSection("ai-prompt")} onCharts={() => expandSection("profile-charts")} onReport={() => { props.onShowReport(); expandSection("report-cell"); }} onExport={() => dataset && window.open(`/api/datasets/${dataset.dataset_id}/export?version_id=${dataset.profile.version_id}`, "_self")} />
-      <Cell type="dataset" title="Upload or select dataset" status={dataset ? "success" : "idle"} collapsed={false}>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="command-button cursor-pointer">
-            <FileUp className="h-3.5 w-3.5" />
-            <span>{upload.isPending ? "Uploading..." : "Upload dataset"}</span>
-            <input ref={uploadInputRef} type="file" accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.jsonl" className="hidden" onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) upload.mutate(file);
-              event.currentTarget.value = "";
-            }} />
-          </label>
-          <button className="command-button text-muted" disabled={isRefreshing} onClick={props.onRefresh} type="button"><RefreshCw className={isRefreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} /> Refresh</button>
-          <span className={healthStatus === "connected" ? "text-xs text-ok" : healthStatus === "checking" ? "text-xs text-warn" : "text-xs text-bad"}>API {healthStatus}</span>
-          {providerStatus && <span className={providerStatus.connection === "connected" ? "text-xs text-ok" : "text-xs text-warn"} title={providerStatus.connection_error ?? undefined}>Gemini {providerStatus.connection === "connected" ? "connected" : providerStatus.connection === "error" ? "needs attention" : "not configured"}</span>}
-        </div>
-        {upload.isPending && <p className="mt-2 text-xs text-muted">Uploading and profiling the file...</p>}
-        {dataset?.storage_path && <p className="mt-2 truncate font-mono text-xs text-muted">Stored at {dataset.storage_path}</p>}
-        {upload.error && <p className="mt-2 text-xs text-bad">{upload.error.message}</p>}
-      </Cell>
+      <NotebookActionRow dataset={dataset} versions={dataset?.versions ?? []} activeVersionId={dataset?.profile.version_id} sandboxId={activeSandboxId} sandboxes={sandboxes} onVersionChange={props.onVersionChange} onSandboxChange={props.onSandboxChange} onUpload={() => uploadInputRef.current?.click()} onCreateSandbox={props.onCreateSandbox} onAddCell={props.onAddManualCell} onRun={() => selectedManualCell ? props.onRunManualCell(selectedManualCell) : props.onRunCode()} onStop={props.onStop} onRestart={props.onRestartSandbox} onAskAI={() => expandSection("pipeline-plan")} onCharts={() => setArtifactTab("charts")} onReport={() => { props.onShowReport(); expandSection("pipeline-report"); }} onExport={() => dataset && window.open(`/api/datasets/${dataset.dataset_id}/export?version_id=${dataset.profile.version_id}`, "_self")} />
 
-      {dataset && <>
-        <div id="dataset-status"><DatasetStatusRow dataset={dataset} sandbox={activeSandbox} lastStatus={executionStage} /></div>
-        <DatasetActionRow onPreview={() => expandSection("dataset-preview")} onProfile={() => expandSection("dataset-profile")} onSchema={() => expandSection("report-cell")} onIssues={() => expandSection("dataset-profile")} onCompare={() => expandSection("comparison-cell")} onExport={() => window.open(`/api/datasets/${dataset.dataset_id}/export`, "_self")} />
-        <AgentCommandCenter
-          dataset={dataset}
-          sandbox={activeSandbox}
-          prompt={agentPrompt}
-          pending={agentPending}
-          result={taskResults[activeSandboxId]}
-          error={taskError}
-          onPromptChange={props.onAgentPromptChange}
-          onRun={(prompt) => props.onRunSandboxTask(activeSandboxId, prompt)}
-        />
-        {(run || Object.keys(taskResults).length > 0) && <SandboxPromptBars sandboxes={sandboxes} taskResults={taskResults} pendingSandboxId={taskPendingSandboxId} error={taskError} onRun={props.onRunSandboxTask} />}
-        <div id="dataset-profile"><Cell type="profile" title="Dataset metadata" status="success" sandbox={activeSandbox?.name} collapsed={openSection !== "dataset-profile"} onToggleCollapsed={() => expandSection("dataset-profile")}>
-          <div className="metric-grid"><Metric label="Rows" value={formatNumber(dataset.profile.rows)} /><Metric label="Columns" value={formatNumber(dataset.profile.columns)} /><Metric label="Duplicates" value={formatNumber(dataset.profile.duplicate_rows)} /><Metric label="Quality" value={`${dataset.profile.data_quality_score}%`} /></div>
-          {dataset.profile.detected_problems.length > 0 && <div className="mt-3 grid gap-2 sm:grid-cols-2">{dataset.profile.detected_problems.slice(0, 8).map((issue) => <div key={issue} className="border border-line bg-base px-2 py-1.5 text-xs text-muted">{issue}</div>)}</div>}
-        </Cell></div>
+      <PipelineStepper
+        dataset={dataset}
+        upload={upload}
+        uploadInputRef={uploadInputRef}
+        activeSandbox={activeSandbox}
+        activeVersionId={dataset?.profile.version_id}
+        healthStatus={healthStatus}
+        providerStatus={providerStatus}
+        isRefreshing={isRefreshing}
+        executionStage={executionStage}
+        instruction={instruction}
+        onInstructionChange={props.onInstructionChange}
+        onRefresh={props.onRefresh}
+        onRunSandboxTask={(prompt) => props.onRunSandboxTask(activeSandboxId, prompt)}
+        sandboxPending={agentPending}
+        task={activeTask}
+        taskError={taskError}
+        approvePending={activeTask ? approveTaskPendingId === activeTask.task_id : approve.isPending}
+        approveError={approveTaskError ?? approve.error?.message}
+        onApprove={() => activeTask ? props.onApproveSandboxTask(activeTask.task_id) : props.onApprove()}
+        run={run}
+        code={activeTask?.generated_code.code ?? code}
+        onCodeChange={props.onCodeChange}
+        onRunCode={props.onRunCode}
+        codePending={executeCode.isPending}
+        codeError={executeCode.error?.message}
+        report={report}
+        reportLoading={reportLoading}
+        reportPreview={reportPreview}
+        reportTheme={reportTheme}
+        reportPdfUrl={reportPdfUrl}
+        onShowReport={props.onShowReport}
+        onRefreshReport={props.onRefreshReport}
+        onToggleReportTheme={props.onToggleReportTheme}
+      />
 
-        <div id="profile-charts"><Cell type="graph" title="Profile visualizations" status="success" sandbox={activeSandbox?.name} collapsed={openSection !== "profile-charts"} onToggleCollapsed={() => expandSection("profile-charts")}><ProfileCharts profile={dataset.profile} /></Cell></div>
-        <div id="dataset-preview"><Cell type="preview" title="Original data preview" status="success" sandbox={activeSandbox?.name} collapsed={openSection !== "dataset-preview"} onToggleCollapsed={() => expandSection("dataset-preview")}><DataTable rows={dataset.profile.sample_rows} /></Cell></div>
-        <div id="ai-prompt"><Cell type="ai prompt" title="Notebook instruction" status={clean.isPending ? "running" : run ? run.execution.status : "idle"} sandbox={activeSandbox?.name} onRun={() => props.onRunInstruction()} collapsed={openSection !== "ai-prompt"} onToggleCollapsed={() => expandSection("ai-prompt")}>
-          <textarea className="min-h-24 w-full resize-y border border-line bg-base p-3 text-sm text-ink outline-none focus:border-accent" value={instruction} onChange={(event) => props.onInstructionChange(event.target.value)} />
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <select className="compact-select" value={activeSandboxId} onChange={(event) => props.onSandboxChange(event.target.value)}>{sandboxes.map((sandbox) => <option key={sandbox.id} value={sandbox.id}>{sandbox.name}</option>)}</select>
-            <select className="compact-select" defaultValue="gemini"><option value="gemini">Gemini</option><option value="rule">Local fallback</option></select>
-            <select className="compact-select" defaultValue="run"><option value="plan">Plan only</option><option value="cells">Generate cells</option><option value="run">Generate and run</option><option value="report">Generate report</option></select>
-            <button className="primary-button" disabled={clean.isPending || !instruction.trim()} onClick={() => props.onRunInstruction()} type="button"><Sparkles className="h-3.5 w-3.5" />{clean.isPending ? "Planning..." : "Generate and run"}</button>
-            <button className="text-action" disabled={!instruction.trim() || planPending} onClick={() => props.onCreatePlan()} type="button">{planPending ? "Planning..." : "Plan only"}</button>
-            {(clean.isPending || planPending) && <span className="text-xs text-muted">{executionStage}: structured plan, safety validation, then execution.</span>}
-            {clean.error && <span className="text-xs text-bad">{clean.error.message}</span>}
-          </div>
-        </Cell></div>
-      </>}
-
-      {analysisPlan && !run && <PlanCell plan={analysisPlan} sandboxName={activeSandbox?.name} onRun={() => props.onRunInstruction()} />}
-
-      {run && <>
-        <Cell type="cleaning plan" title="AI cleaning plan" status="success" sandbox="AI cleaning">
-          <p className="mb-3 text-sm text-muted">{run.plan.summary}</p>
-          <div className="space-y-1.5">{run.plan.operations.length ? run.plan.operations.map((operation) => <div key={operation.id} className="border border-line bg-base px-3 py-2 text-xs"><div className="flex items-center justify-between gap-3"><span className="font-medium text-ink">{operation.title}</span><span className={operation.destructive ? "text-warn" : "text-muted"}>{operation.destructive ? "destructive" : "reversible"}</span></div><p className="mt-1 text-muted">{operation.reason}</p></div>) : <p className="text-xs text-muted">Manual code execution. Review the source and validation output before approval.</p>}</div>
-        </Cell>
-        <Cell type="ai python" title="cleaning_script.py" status={executeCode.isPending ? "running" : run.execution.status} duration={`${run.execution.duration_ms}ms`} sandbox="AI cleaning" onRun={props.onRunCode}>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="inline-flex items-center gap-2 text-muted"><ShieldCheck className="h-3.5 w-3.5 text-ok" />{run.plan.operations.length ? "AI-generated source. You can edit it before running again." : "Manual notebook source."}</span><button className="command-button text-muted" disabled={!code.trim() || executeCode.isPending} onClick={props.onRunCode} type="button"><FileCode2 className="h-3.5 w-3.5" />{executeCode.isPending ? "Running..." : "Run edited code"}</button></div>
-          <Editor height="420px" defaultLanguage="python" value={code} onChange={(value) => props.onCodeChange(value ?? "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 12, lineNumbersMinChars: 3, scrollBeyondLastLine: false, wordWrap: "on", padding: { top: 12 } }} />
-          {executeCode.error && <p className="mt-2 text-xs text-bad">{executeCode.error.message}</p>}
-        </Cell>
-        <ResultCell run={run} approvePending={approve.isPending} approveError={approve.error?.message} datasetId={dataset?.dataset_id} onApprove={props.onApprove} onReject={props.onReject} />
-        <div id="comparison-cell"><Cell type="comparison" title="Original versus cleaned preview" status={run.execution.status} sandbox="AI cleaning" collapsed={openSection !== "comparison-cell"} onToggleCollapsed={() => expandSection("comparison-cell")}><div className="grid gap-3 xl:grid-cols-2"><div><div className="mb-2 text-xs text-muted">Original</div><DataTable rows={run.original_preview} /></div><div><div className="mb-2 text-xs text-muted">Cleaned</div><DataTable rows={run.execution.preview_rows} /></div></div></Cell></div>
-      </>}
-
-      {Object.values(taskResults).map((task) => <TaskResultCell key={task.task_id} task={task} sandboxName={sandboxes.find((sandbox) => sandbox.id === task.sandbox_id)?.name ?? task.sandbox_id} />)}
+      {dataset && <ArtifactTabs tab={artifactTab} onTabChange={setArtifactTab} dataset={dataset} report={report} reportPdfUrl={reportPdfUrl} onReportChanged={props.onRefreshReport} />}
 
       {manualCells.map((cell) => <ManualNotebookCell key={cell.id} cell={cell} sandboxName={sandboxes.find((sandbox) => sandbox.id === cell.sandboxId)?.name ?? "Unassigned"} selected={selectedCellId === cell.id} onSelect={() => props.onSelectManualCell(cell.id)} onChange={(source) => props.onUpdateManualCell(cell.id, { source, status: "idle" })} onRun={() => props.onRunManualCell(cell)} onDuplicate={() => props.onAddManualCell(cell.type, cell.id)} onAddBelow={() => props.onAddManualCell("python", cell.id)} onToggleReport={() => props.onUpdateManualCell(cell.id, { includeInReport: !cell.includeInReport })} onDelete={() => props.onRemoveManualCell(cell.id)} />)}
-
-      {dataset && <div id="report-cell"><Cell type="report" title="Data quality report" status={reportLoading ? "running" : "success"} sandbox={activeSandbox?.name} collapsed={openSection !== "report-cell"} onToggleCollapsed={() => expandSection("report-cell")}>
-        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-ink">{report?.title ?? "Preparing report..."}</p><p className="mt-1 text-xs text-muted">Column statistics, profile findings, correlations, and the latest run validation are kept with this dataset.</p></div><div className="flex gap-2"><button className="command-button text-muted" onClick={props.onShowReport} type="button"><FileText className="h-3.5 w-3.5" /> Preview report</button><a className="command-button text-muted" href={reportPdfUrl}><Download className="h-3.5 w-3.5" /> Download PDF</a></div></div>
-        {reportPreview && report && <VisualReport report={report} pdfUrl={reportPdfUrl} onRefresh={props.onRefreshReport} theme={reportTheme} onToggleTheme={props.onToggleReportTheme} />}
-        {reportPreview && !report && <div className="mt-3 border border-line p-3 text-xs text-muted">Building visual report from the selected dataset version...</div>}
-        {report && <div id="column-report" className="mt-3 max-h-64 overflow-auto border border-line"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-panel text-muted"><tr><th className="px-2 py-2">Column</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Nulls</th><th className="px-2 py-2">Unique</th><th className="px-2 py-2">Mean</th><th className="px-2 py-2">Outliers</th></tr></thead><tbody>{report.columns.map((column) => <tr key={String(column.name)} className="border-t border-line/60"><td className="px-2 py-1.5 font-mono text-ink">{String(column.name)}</td><td className="px-2 py-1.5 text-muted">{String(column.type)}</td><td className="px-2 py-1.5 text-muted">{String(column.null_count)} ({String(column.null_percentage)}%)</td><td className="px-2 py-1.5 text-muted">{String(column.unique_count)}</td><td className="px-2 py-1.5 text-muted">{column.mean == null ? "-" : String(column.mean)}</td><td className="px-2 py-1.5 text-muted">{String(column.outlier_count)}</td></tr>)}</tbody></table></div>}
-      </Cell></div>}
     </main>
   );
 }
 
+function PipelineStepper({
+  dataset,
+  upload,
+  uploadInputRef,
+  activeSandbox,
+  activeVersionId,
+  healthStatus,
+  providerStatus,
+  isRefreshing,
+  executionStage,
+  instruction,
+  onInstructionChange,
+  onRefresh,
+  onRunSandboxTask,
+  sandboxPending,
+  task,
+  taskError,
+  approvePending,
+  approveError,
+  onApprove,
+  run,
+  code,
+  onCodeChange,
+  onRunCode,
+  codePending,
+  codeError,
+  report,
+  reportLoading,
+  reportPreview,
+  reportTheme,
+  reportPdfUrl,
+  onShowReport,
+  onRefreshReport,
+  onToggleReportTheme
+}: {
+  dataset: UploadResponse | null;
+  upload: UseMutationResult<UploadResponse, Error, File, unknown>;
+  uploadInputRef: React.RefObject<HTMLInputElement>;
+  activeSandbox?: NotebookSandbox;
+  activeVersionId?: string;
+  healthStatus: "checking" | "connected" | "offline";
+  providerStatus?: import("./lib/api").AIProviderStatus;
+  isRefreshing: boolean;
+  executionStage: string;
+  instruction: string;
+  onInstructionChange: (value: string) => void;
+  onRefresh: () => void;
+  onRunSandboxTask: (prompt: string) => void;
+  sandboxPending: boolean;
+  task?: SandboxTaskResult;
+  taskError?: string;
+  approvePending: boolean;
+  approveError?: string;
+  onApprove: () => void;
+  run: CleaningRun | null;
+  code: string;
+  onCodeChange: (value: string) => void;
+  onRunCode: () => void;
+  codePending: boolean;
+  codeError?: string;
+  report?: DatasetReport;
+  reportLoading: boolean;
+  reportPreview: boolean;
+  reportTheme: "light" | "dark";
+  reportPdfUrl: string;
+  onShowReport: () => void;
+  onRefreshReport: () => void;
+  onToggleReportTheme: () => void;
+}) {
+  const [openStep, setOpenStep] = useState("plan");
+  const [provider, setProvider] = useState<"rule" | "gemini">((providerStatus?.active_provider as "rule" | "gemini" | undefined) ?? "rule");
+  const command = instruction.trim();
+  const sandboxSuccess = task?.execution.status === "success" || run?.execution.status === "success";
+  const approved = Boolean(dataset && dataset.versions.length > 1);
+  const originalQuality = dataset?.versions[0]?.quality ?? dataset?.profile.data_quality_score ?? 0;
+  const qualityDelta = dataset ? dataset.profile.data_quality_score - originalQuality : 0;
+  const runRowsBefore = task ? dataset?.profile.rows : Number(run?.comparison.rows_before ?? dataset?.profile.rows ?? 0);
+  const runRowsAfter = task ? Number(task.execution.cleaned_metadata.rows ?? 0) : Number(run?.comparison.rows_after ?? 0);
+  const previewRows = task?.execution.preview_rows ?? run?.execution.preview_rows ?? [];
+  const originalRows = run?.original_preview ?? dataset?.profile.sample_rows ?? [];
+  const generatedFiles = task?.execution.generated_files ?? run?.execution.generated_files ?? [];
+  const status = sandboxPending || codePending ? "running" : task?.execution.status ?? run?.execution.status ?? "idle";
+  const disabledReason = dataset ? undefined : "Upload a dataset first.";
+  const displayCode = redactTaskTextFromCode(code, instruction);
+
+  return (
+    <section className="pipeline-shell">
+      <div className="pipeline-header">
+        <div className="min-w-0">
+          <div className="text-xs uppercase text-muted">Pipeline</div>
+          <div className="mt-1 truncate text-sm font-medium text-ink">
+            {dataset ? `${dataset.filename} · ${activeVersionId ?? "v1"} · ${activeSandbox?.name ?? "Main analysis"}` : "No dataset loaded"}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className={healthStatus === "connected" ? "text-ok" : healthStatus === "checking" ? "text-warn" : "text-bad"}>API {healthStatus}</span>
+          {providerStatus && <span className={providerStatus.connection === "connected" ? "text-ok" : "text-muted"}>Provider {providerStatus.active_provider}</span>}
+          <button className="icon-button" disabled={isRefreshing} onClick={onRefresh} title="Refresh datasets" type="button"><RefreshCw className={isRefreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} /></button>
+        </div>
+      </div>
+
+      <div className="pipeline-steps">
+        <PipelineStep index={1} id="upload" title="Upload" status={dataset ? "complete" : upload.isPending ? "running" : "active"} summary={dataset ? `${formatNumber(dataset.profile.rows)} rows profiled automatically` : "Dataset ingestion starts the pipeline"} open={openStep === "upload" || !dataset} onOpen={setOpenStep}>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="command-button cursor-pointer">
+              <FileUp className="h-3.5 w-3.5" />
+              <span>{upload.isPending ? "Uploading..." : dataset ? "Replace dataset" : "Upload dataset"}</span>
+              <input ref={uploadInputRef} type="file" accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.jsonl" className="hidden" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) upload.mutate(file);
+                event.currentTarget.value = "";
+              }} />
+            </label>
+            {dataset && <span className="text-xs text-muted">{dataset.profile.file_format.toUpperCase()} · {formatNumber(dataset.profile.columns)} columns · quality {dataset.profile.data_quality_score}%</span>}
+          </div>
+          {upload.error && <p className="mt-2 text-xs text-bad">{upload.error.message}</p>}
+        </PipelineStep>
+
+        <PipelineStep index={2} id="profile" title="Profile" status={dataset ? "complete" : "locked"} summary={dataset ? `${formatNumber(dataset.profile.rows)} rows · ${formatNumber(dataset.profile.columns)} columns · ${dataset.profile.data_quality_score}% quality` : disabledReason} open={openStep === "profile"} onOpen={setOpenStep}>
+          {dataset && <div className="grid gap-3">
+            <div className="metric-grid"><Metric label="Rows" value={formatNumber(dataset.profile.rows)} /><Metric label="Columns" value={formatNumber(dataset.profile.columns)} /><Metric label="Duplicates" value={formatNumber(dataset.profile.duplicate_rows)} /><Metric label="Quality" value={`${dataset.profile.data_quality_score}%`} /></div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(dataset.profile.detected_problems.length ? dataset.profile.detected_problems.slice(0, 6) : ["No major profile issues detected."]).map((issue) => <div key={issue} className="border border-line bg-base px-2 py-1.5 text-xs text-muted">{issue}</div>)}
+            </div>
+          </div>}
+        </PipelineStep>
+
+        <PipelineStep index={3} id="plan" title="Plan" status={dataset ? command ? "active" : "ready" : "locked"} summary={dataset ? "Enter the task once, choose provider, then run the sandbox." : disabledReason} open={openStep === "plan" && Boolean(dataset)} onOpen={setOpenStep}>
+          {dataset && <div id="pipeline-plan" className="grid gap-3">
+            <textarea
+              className="min-h-24 w-full resize-y border border-line bg-base p-3 text-sm text-ink outline-none focus:border-accent"
+              value={instruction}
+              onChange={(event) => onInstructionChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && command && !sandboxPending) {
+                  event.preventDefault();
+                  onRunSandboxTask(command);
+                  setOpenStep("run");
+                }
+              }}
+              placeholder="Clean nulls and duplicates, filter age > 30, or train Random Forest to predict churn."
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <select className="compact-select" value={provider} onChange={(event) => setProvider(event.target.value as "rule" | "gemini")}>
+                <option value="rule">Rule-based</option>
+                <option value="gemini">Gemini</option>
+              </select>
+              <button className="primary-button" disabled={!command || sandboxPending} onClick={() => { onRunSandboxTask(command); setOpenStep("run"); }} type="button">
+                <Sparkles className="h-3.5 w-3.5" />
+                {sandboxPending ? <ThinkingPill compact /> : "Run sandbox"}
+              </button>
+              <span className="text-xs text-muted">{provider === "gemini" ? "Uses configured Gemini when available." : "Uses local deterministic rules."}</span>
+            </div>
+            {taskError && <p className="text-xs text-bad">{taskError}</p>}
+          </div>}
+        </PipelineStep>
+
+        <PipelineStep index={4} id="run" title="Sandbox Run" status={dataset ? status : "locked"} summary={dataset ? `${executionStage}${generatedFiles.length ? ` · ${generatedFiles.length} files` : ""}` : disabledReason} open={openStep === "run" && Boolean(dataset)} onOpen={setOpenStep}>
+          {dataset && <div className="grid gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <StatusBadge status={status} />
+              <button className="command-button text-muted" disabled={!command || sandboxPending} onClick={() => onRunSandboxTask(command)} type="button"><RefreshCw className="h-3.5 w-3.5" />Re-run</button>
+            </div>
+            {code ? <Editor height="300px" defaultLanguage="python" value={displayCode} onChange={(value) => onCodeChange(value ?? "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 12, lineNumbersMinChars: 3, scrollBeyondLastLine: false, wordWrap: "on", padding: { top: 12 } }} /> : <div className="pipeline-empty">Generated code appears here after the sandbox run starts.</div>}
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="command-button text-muted" disabled={!code.trim() || codePending} onClick={onRunCode} type="button"><FileCode2 className="h-3.5 w-3.5" />{codePending ? "Running edited code..." : "Run edited code"}</button>
+              {generatedFiles.map((file) => <span key={file} className="pipeline-chip">{file}</span>)}
+            </div>
+            {(task?.execution.stderr || run?.execution.stderr || codeError) && <pre className="max-h-40 overflow-auto whitespace-pre-wrap border border-line bg-base p-2 font-mono text-xs text-bad">{codeError ?? task?.execution.stderr ?? run?.execution.stderr}</pre>}
+          </div>}
+        </PipelineStep>
+
+        <PipelineStep index={5} id="review" title="Review & Diff" status={sandboxSuccess ? "active" : "locked"} summary={sandboxSuccess ? `${formatNumber(Number(runRowsBefore ?? 0))} -> ${formatNumber(Number(runRowsAfter ?? 0))} rows` : "Shown after a successful sandbox run."} open={openStep === "review" && sandboxSuccess} onOpen={setOpenStep}>
+          {sandboxSuccess && <div className="grid gap-3">
+            <div className="metric-grid"><Metric label="Rows" value={`${formatNumber(Number(runRowsBefore ?? 0))} -> ${formatNumber(Number(runRowsAfter ?? 0))}`} /><Metric label="Files" value={generatedFiles.length} /><Metric label="Quality delta" value={approved ? `${qualityDelta >= 0 ? "+" : ""}${qualityDelta.toFixed(1)}%` : "Pending approval"} /><Metric label="Status" value="Ready to review" /></div>
+            <div className="grid gap-3 xl:grid-cols-2">
+              <div><div className="mb-2 text-xs text-muted">Before sample</div><DataTable rows={originalRows.slice(0, 8)} /></div>
+              <div><div className="mb-2 text-xs text-muted">After sample</div><DataTable rows={previewRows.slice(0, 8)} /></div>
+            </div>
+          </div>}
+        </PipelineStep>
+
+        <PipelineStep index={6} id="approve" title="Approve" status={approved ? "complete" : sandboxSuccess ? "active" : "locked"} summary={approved ? `Approved version ${dataset?.versions[dataset.versions.length - 1]?.id}` : sandboxSuccess ? "Promote this run into an immutable dataset version." : "Available after review."} open={openStep === "approve" && Boolean(dataset) && sandboxSuccess} onOpen={setOpenStep}>
+          {sandboxSuccess && <div className="flex flex-wrap items-center gap-2">
+            <button className="success-button" disabled={approvePending || approved} onClick={onApprove} type="button"><ShieldCheck className="h-3.5 w-3.5" />{approvePending ? "Approving..." : approved ? "Approved" : "Approve as version"}</button>
+            {approveError && <span className="text-xs text-bad">{approveError}</span>}
+          </div>}
+        </PipelineStep>
+
+        <PipelineStep index={7} id="report" title="Report" status={approved ? reportLoading ? "running" : "active" : "locked"} summary={approved ? "Visual report and PDF export are enabled." : "Enabled only after approval."} open={openStep === "report" && approved} onOpen={setOpenStep}>
+          {approved && <div id="pipeline-report" className="grid gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="command-button text-muted" onClick={onShowReport} type="button"><FileText className="h-3.5 w-3.5" />Preview report</button>
+              <a className="command-button text-muted" href={reportPdfUrl}><Download className="h-3.5 w-3.5" />Download PDF</a>
+            </div>
+            {reportPreview && report && <VisualReport report={report} pdfUrl={reportPdfUrl} onRefresh={onRefreshReport} theme={reportTheme} onToggleTheme={onToggleReportTheme} />}
+            {reportPreview && !report && <div className="pipeline-empty">Building visual report from the approved version...</div>}
+          </div>}
+        </PipelineStep>
+      </div>
+    </section>
+  );
+}
+
+function PipelineStep({ index, id, title, status, summary, open, onOpen, children }: { index: number; id: string; title: string; status: "idle" | "ready" | "active" | "running" | "success" | "failed" | "blocked" | "complete" | "locked"; summary?: React.ReactNode; open: boolean; onOpen: (id: string) => void; children: React.ReactNode }) {
+  const locked = status === "locked";
+  const complete = status === "complete" || status === "success";
+  return (
+    <article className={`pipeline-step ${locked ? "pipeline-step-locked" : complete ? "pipeline-step-complete" : "pipeline-step-active"}`}>
+      <button className="pipeline-step-head" disabled={locked} onClick={() => onOpen(open ? "" : id)} type="button">
+        <span className="pipeline-step-index">{index}</span>
+        <span className="min-w-0 flex-1 text-left">
+          <span className="block truncate text-sm font-medium text-ink">{title}</span>
+          {summary && <span className="mt-0.5 block truncate text-xs text-muted">{summary}</span>}
+        </span>
+        <StatusBadge status={status} />
+      </button>
+      {open && !locked && <div className="pipeline-step-body">{children}</div>}
+    </article>
+  );
+}
+
+function redactTaskTextFromCode(code: string, instruction: string) {
+  const trimmed = instruction.trim();
+  if (!trimmed) return code;
+  const escapedSingle = trimmed.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const escapedDouble = trimmed.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return code
+    .replace(`'instruction': '${escapedSingle}'`, "'instruction': '[task text kept in Plan step]'")
+    .replace(`"instruction": "${escapedDouble}"`, '"instruction": "[task text kept in Plan step]"');
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === "running") return <ThinkingPill />;
+  const label = status === "complete" ? "complete" : status === "active" ? "ready" : status;
+  const tone = status === "success" || status === "complete" ? "pipeline-status-ok" : status === "failed" || status === "blocked" ? "pipeline-status-bad" : status === "locked" ? "pipeline-status-muted" : "pipeline-status-neutral";
+  return <span className={`pipeline-status ${tone}`}>{label}</span>;
+}
+
+type ArtifactTab = "preview" | "schema" | "issues" | "compare" | "charts" | "graph" | "model" | "export";
+
+function ArtifactTabs({ tab, onTabChange, dataset, report, reportPdfUrl, onReportChanged }: { tab: ArtifactTab; onTabChange: (tab: ArtifactTab) => void; dataset: UploadResponse; report?: DatasetReport; reportPdfUrl: string; onReportChanged?: () => void }) {
+  const approved = dataset.versions.length > 1;
+  const tabs: Array<{ id: ArtifactTab; label: string }> = [
+    { id: "preview", label: "Preview" },
+    { id: "schema", label: "Schema" },
+    { id: "issues", label: "Quality issues" },
+    { id: "compare", label: "Compare versions" },
+    { id: "charts", label: "Charts" },
+    { id: "graph", label: "Graph Studio" },
+    { id: "model", label: "Model Lab" },
+    { id: "export", label: "Export" }
+  ];
+  return (
+    <section className="artifact-panel">
+      <div className="artifact-tabs">
+        {tabs.map((item) => <button key={item.id} className={tab === item.id ? "artifact-tab artifact-tab-active" : "artifact-tab"} onClick={() => onTabChange(item.id)} type="button">{item.label}</button>)}
+      </div>
+      <div className="artifact-body">
+        {tab === "preview" && <DataTable rows={dataset.profile.sample_rows} />}
+        {tab === "schema" && <SchemaTable columns={report?.columns ?? dataset.profile.column_metadata.map((column) => ({ name: column.name, type: column.inferred_type, null_count: column.null_count, null_percentage: column.null_percentage, unique_count: column.unique_count, mean: column.mean, outlier_count: column.outlier_count }))} />}
+        {tab === "issues" && <div className="grid gap-2 sm:grid-cols-2">{(dataset.profile.detected_problems.length ? dataset.profile.detected_problems : ["No quality issues detected."]).map((issue) => <div key={issue} className="border border-line bg-base px-2 py-1.5 text-xs text-muted">{issue}</div>)}</div>}
+        {tab === "compare" && <VersionTable versions={dataset.versions} activeVersionId={dataset.profile.version_id} onGraphStudio={() => onTabChange("graph")} />}
+        {tab === "charts" && <ProfileCharts profile={dataset.profile} />}
+        {tab === "graph" && <GraphStudio dataset={dataset} onReportChanged={onReportChanged} />}
+        {tab === "model" && <ModelLab dataset={dataset} />}
+        {tab === "export" && <div className="flex flex-wrap items-center gap-2"><a className="command-button text-muted" href={`/api/datasets/${dataset.dataset_id}/export?version_id=${dataset.profile.version_id}`}><Download className="h-3.5 w-3.5" />Export current version</a>{approved ? <a className="command-button text-muted" href={reportPdfUrl}><FileText className="h-3.5 w-3.5" />Report PDF</a> : <span className="text-xs text-muted">Report PDF unlocks after approval.</span>}</div>}
+      </div>
+    </section>
+  );
+}
+
+function SchemaTable({ columns }: { columns: Array<Record<string, unknown>> }) {
+  return <div className="max-h-72 overflow-auto border border-line"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-panel text-muted"><tr><th className="px-2 py-2">Column</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Nulls</th><th className="px-2 py-2">Unique</th><th className="px-2 py-2">Mean</th><th className="px-2 py-2">Outliers</th></tr></thead><tbody>{columns.map((column) => <tr key={String(column.name)} className="border-t border-line/60"><td className="px-2 py-1.5 font-mono text-ink">{String(column.name)}</td><td className="px-2 py-1.5 text-muted">{String(column.type)}</td><td className="px-2 py-1.5 text-muted">{String(column.null_count)} ({String(column.null_percentage)}%)</td><td className="px-2 py-1.5 text-muted">{String(column.unique_count)}</td><td className="px-2 py-1.5 text-muted">{column.mean == null ? "-" : String(column.mean)}</td><td className="px-2 py-1.5 text-muted">{String(column.outlier_count)}</td></tr>)}</tbody></table></div>;
+}
+
+function VersionTable({ versions, activeVersionId, onGraphStudio }: { versions: DatasetRecord["versions"]; activeVersionId: string; onGraphStudio: () => void }) {
+  return <div className="max-h-64 overflow-auto border border-line"><table className="w-full text-left text-xs"><thead className="sticky top-0 bg-panel text-muted"><tr><th className="px-2 py-2">Version</th><th className="px-2 py-2">Rows</th><th className="px-2 py-2">Columns</th><th className="px-2 py-2">Quality</th><th className="px-2 py-2">Fingerprint</th><th className="px-2 py-2">Graph</th></tr></thead><tbody>{versions.map((version) => <tr key={version.id} className={version.id === activeVersionId ? "border-t border-line/60 bg-accent/10" : "border-t border-line/60"}><td className="px-2 py-1.5 font-mono text-ink">{version.id}</td><td className="px-2 py-1.5 text-muted">{version.rows}</td><td className="px-2 py-1.5 text-muted">{version.columns}</td><td className="px-2 py-1.5 text-muted">{version.quality}%</td><td className="px-2 py-1.5 font-mono text-muted">{version.fingerprint.slice(0, 12)}</td><td className="px-2 py-1.5"><button className="text-action" onClick={onGraphStudio} type="button">Graph Studio</button></td></tr>)}</tbody></table></div>;
+}
+
 function SandboxPromptBars({
   sandboxes,
+  defaultPrompt,
   taskResults,
   pendingSandboxId,
   error,
   onRun
 }: {
   sandboxes: NotebookSandbox[];
+  defaultPrompt: string;
   taskResults: Record<string, SandboxTaskResult>;
   pendingSandboxId?: string;
   error?: string;
@@ -507,7 +766,7 @@ function SandboxPromptBars({
     <div className="border-b border-line bg-base/30 px-4 py-2 text-xs">
       <div className="space-y-1.5">
         {sandboxes.map((sandbox) => {
-          const value = drafts[sandbox.id] ?? "";
+          const value = drafts[sandbox.id] ?? defaultPrompt;
           const result = taskResults[sandbox.id];
           const pending = pendingSandboxId === sandbox.id;
           return (
@@ -525,7 +784,7 @@ function SandboxPromptBars({
                 }}
                 placeholder="Clean this dataset, train a Random Forest model, evaluate accuracy..."
               />
-              {pending ? <span className="agent-status-shine">working</span> : result && <span className={result.execution.status === "success" ? "agent-status-success" : "text-bad"}>{result.execution.status === "success" ? "✓ success" : result.execution.status}</span>}
+              {pending ? <ThinkingPill /> : result && <span className={result.execution.status === "success" ? "agent-status-success" : "text-bad"}>{result.execution.status === "success" ? "✓ success" : result.execution.status}</span>}
               <button
                 className="cell-icon-button"
                 disabled={!value.trim() || pending}
@@ -544,6 +803,93 @@ function SandboxPromptBars({
       </div>
       {error && <p className="mt-2 text-bad">{error}</p>}
     </div>
+  );
+}
+
+function CommandWorkspace({
+  dataset,
+  upload,
+  uploadInputRef,
+  healthStatus,
+  providerStatus,
+  isRefreshing,
+  onRefresh,
+  sandbox,
+  pending,
+  result,
+  error,
+  command,
+  onCommandChange,
+  onRun
+}: {
+  dataset: UploadResponse | null;
+  upload: UseMutationResult<UploadResponse, Error, File, unknown>;
+  uploadInputRef: React.RefObject<HTMLInputElement>;
+  healthStatus: "checking" | "connected" | "offline";
+  providerStatus?: import("./lib/api").AIProviderStatus;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  sandbox?: NotebookSandbox;
+  pending: boolean;
+  result?: SandboxTaskResult;
+  error?: string;
+  command: string;
+  onCommandChange: (value: string) => void;
+  onRun: (prompt: string) => void;
+}) {
+  const trimmedCommand = command.trim();
+  return (
+    <section className="command-workspace border-b border-line bg-notebook px-4 py-6">
+      <div className="mx-auto grid w-full max-w-4xl gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="min-w-0">
+            <div className="font-medium text-ink">{dataset ? dataset.filename : "Start with a dataset"}</div>
+            <div className="mt-0.5 truncate text-muted">
+              {dataset ? `${formatNumber(dataset.profile.rows)} rows · ${formatNumber(dataset.profile.columns)} columns · ${sandbox?.name ?? "Main sandbox"}` : "Upload, profile, then ask the agent for the exact output you want."}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={healthStatus === "connected" ? "text-ok" : healthStatus === "checking" ? "text-warn" : "text-bad"}>API {healthStatus}</span>
+            {providerStatus && <span className={providerStatus.connection === "connected" ? "text-ok" : "text-warn"} title={providerStatus.connection_error ?? undefined}>Gemini {providerStatus.connection === "connected" ? "connected" : providerStatus.connection === "error" ? "needs attention" : "local mode"}</span>}
+            <button className="icon-button" disabled={isRefreshing} onClick={onRefresh} title="Refresh datasets" type="button"><RefreshCw className={isRefreshing ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} /></button>
+          </div>
+        </div>
+        <div className="agent-prompt-box">
+          <textarea
+            className="min-h-20 flex-1 resize-none bg-transparent text-sm text-ink outline-none"
+            value={command}
+            disabled={!dataset || pending}
+            onChange={(event) => onCommandChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && trimmedCommand && !pending && dataset) {
+                event.preventDefault();
+                onRun(trimmedCommand);
+              }
+            }}
+            placeholder={dataset ? "Clean nulls and duplicates, or: only filter age > 30, or: train Random Forest to predict churn." : "Upload a CSV, Excel, Parquet, JSON, or TSV file first."}
+          />
+          <div className="flex shrink-0 flex-col justify-end gap-2">
+            <label className="command-button cursor-pointer">
+              <FileUp className="h-3.5 w-3.5" />
+              <span>{upload.isPending ? "Uploading" : dataset ? "Replace" : "Upload"}</span>
+              <input ref={uploadInputRef} type="file" accept=".csv,.tsv,.xlsx,.xls,.parquet,.json,.jsonl" className="hidden" onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) upload.mutate(file);
+                event.currentTarget.value = "";
+              }} />
+            </label>
+            <button className="primary-button" disabled={!dataset || !trimmedCommand || pending} onClick={() => onRun(trimmedCommand)} type="button">
+              <Send className="h-3.5 w-3.5" />
+              {pending ? <ThinkingPill compact /> : "Run"}
+            </button>
+          </div>
+        </div>
+        {(pending || result) && <AgentTimeline stages={result?.workflow.length ? result.workflow : ["planning", "preprocessing", "execution", "validation"]} pending={pending} result={result} />}
+        {upload.isPending && <p className="text-xs text-muted">Uploading and profiling the file...</p>}
+        {upload.error && <p className="text-xs text-bad">{upload.error.message}</p>}
+        {error && <p className="text-xs text-bad">{error}</p>}
+      </div>
+    </section>
   );
 }
 
@@ -623,7 +969,7 @@ function AgentTimeline({ stages, pending, result }: { stages: string[]; pending:
       {labels.map((stage, index) => (
         <div key={`${stage}-${index}`} className="agent-stage">
           <span className={pending ? "agent-stage-dot agent-stage-dot-live" : "agent-stage-dot"} />
-          <span className={pending ? "agent-status-shine truncate" : "truncate"}>{stage.split("_").join(" ")}</span>
+          <span className={pending ? "truncate text-[#b9bed6]" : "truncate"}>{stage.split("_").join(" ")}</span>
         </div>
       ))}
       {attempt?.detected_error && (
@@ -636,8 +982,28 @@ function AgentTimeline({ stages, pending, result }: { stages: string[]; pending:
   );
 }
 
-function TaskResultCell({ task, sandboxName }: { task: SandboxTaskResult; sandboxName: string }) {
+function ThinkingPill({ compact = false }: { compact?: boolean }) {
+  return <span className={compact ? "thinking-pill thinking-pill-compact" : "thinking-pill"}>Thinking</span>;
+}
+
+function TaskResultCell({
+  task,
+  sandboxName,
+  datasetId,
+  approvePending,
+  approveError,
+  onApprove
+}: {
+  task: SandboxTaskResult;
+  sandboxName: string;
+  datasetId?: string;
+  approvePending: boolean;
+  approveError?: string;
+  onApprove: () => void;
+}) {
   const model = task.execution.validation_report?.model as Record<string, any> | undefined;
+  const featureImportance = Array.isArray(model?.feature_importance) ? model.feature_importance as Array<{ feature: string; importance: number }> : [];
+  const predictionPreview = Array.isArray(model?.predictions_preview) ? model.predictions_preview as Record<string, unknown>[] : [];
   return (
     <Cell type="sandbox" title={`Task: ${task.instruction}`} status={task.execution.status} sandbox={sandboxName} defaultCollapsed>
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
@@ -647,6 +1013,13 @@ function TaskResultCell({ task, sandboxName }: { task: SandboxTaskResult; sandbo
           <Metric label="Generated files" value={task.execution.generated_files.join(", ") || "None"} />
           {model && <Metric label="Model" value={`${model.model ?? model.status}${model.target ? ` · target ${model.target}` : ""}`} />}
           {model?.metrics && <pre className="max-h-40 overflow-auto border border-line bg-base p-2 font-mono text-muted">{JSON.stringify(model.metrics, null, 2)}</pre>}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {datasetId && <button className="success-button" disabled={task.execution.status !== "success" || approvePending} onClick={onApprove} type="button"><ShieldCheck className="h-3.5 w-3.5" />{approvePending ? "Approving..." : "Approve as version"}</button>}
+            <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/cleaned.csv`}><Download className="h-3.5 w-3.5" />Cleaned CSV</a>
+            <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/features.csv`}><Download className="h-3.5 w-3.5" />Features</a>
+            {task.execution.generated_files.includes("predictions.csv") && <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/predictions.csv`}><Download className="h-3.5 w-3.5" />Predictions</a>}
+            {approveError && <span className="self-center text-bad">{approveError}</span>}
+          </div>
         </div>
         <div>
           <div className="mb-2 text-xs text-muted">Self-healing attempts</div>
@@ -664,7 +1037,31 @@ function TaskResultCell({ task, sandboxName }: { task: SandboxTaskResult; sandbo
           </div>
         </div>
       </div>
+      {featureImportance.length > 0 && <ModelBars items={featureImportance} />}
+      {task.execution.preview_rows.length > 0 && <div className="mt-3"><div className="mb-2 text-xs text-muted">Cleaned output preview</div><DataTable rows={task.execution.preview_rows} /></div>}
+      {predictionPreview.length > 0 && <div className="mt-3"><div className="mb-2 text-xs text-muted">Prediction sample</div><DataTable rows={predictionPreview} /></div>}
     </Cell>
+  );
+}
+
+function ModelBars({ items }: { items: Array<{ feature: string; importance: number }> }) {
+  const max = Math.max(...items.map((item) => Number(item.importance) || 0), 0.001);
+  return (
+    <div className="mt-3 border border-line bg-base p-3">
+      <div className="mb-2 text-xs font-medium text-ink">Feature importance</div>
+      <div className="grid gap-1.5">
+        {items.map((item) => {
+          const width = `${Math.max(3, (Number(item.importance) / max) * 100)}%`;
+          return (
+            <div key={item.feature} className="grid grid-cols-[minmax(110px,180px)_1fr_64px] items-center gap-2 text-xs">
+              <span className="truncate font-mono text-muted">{item.feature}</span>
+              <span className="h-2 bg-panel"><span className="block h-2 bg-accent" style={{ width }} /></span>
+              <span className="text-right font-mono text-ink">{Number(item.importance).toFixed(3)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

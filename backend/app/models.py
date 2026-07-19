@@ -90,6 +90,62 @@ class AppSettingsUpdate(BaseModel):
     gemini_model: str = "gemini-3.5-flash"
 
 
+class ChartFilter(BaseModel):
+    column: str
+    operator: Literal["=", "!=", ">", ">=", "<", "<=", "contains", "not_contains", "is_null", "not_null"]
+    value: Any = None
+
+
+class ChartConfigCreate(BaseModel):
+    version_id: str
+    chart_type: Literal["histogram", "bar", "line", "scatter", "box", "heatmap", "missingness"]
+    x_field: str | None = None
+    y_field: str | None = None
+    groupby: list[str] = Field(default_factory=list)
+    agg: Literal["count", "sum", "mean", "min", "max"] = "count"
+    filters: list[ChartFilter] = Field(default_factory=list)
+    title: str = Field(min_length=1, max_length=160)
+
+
+class ChartConfig(ChartConfigCreate):
+    id: str
+    dataset_id: str
+    created_at: str
+
+
+class DatasetQueryResponse(BaseModel):
+    dataset_id: str
+    version_id: str
+    rows: int
+    columns: list[str]
+    data: list[dict[str, Any]]
+
+
+class ModelTrainingRequest(BaseModel):
+    target: str
+    features: list[str] | Literal["auto"] = "auto"
+    task_type: Literal["auto", "classification", "regression"] = "auto"
+    model_type: Literal["logistic_regression", "linear_regression", "random_forest", "gradient_boosting"] = "random_forest"
+    hyperparameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelRunRecord(BaseModel):
+    id: str
+    dataset_id: str
+    version_id: str
+    target: str
+    features: list[str]
+    task_type: Literal["classification", "regression"]
+    model_type: str
+    hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    metrics: dict[str, float | None] = Field(default_factory=dict)
+    feature_importances: list[dict[str, Any]] = Field(default_factory=list)
+    training_time_seconds: float = 0.0
+    created_at: str
+    model_path: str = ""
+    execution: dict[str, Any] | None = None
+
+
 class CleaningOperation(BaseModel):
     id: str
     title: str
