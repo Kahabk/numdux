@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { BarChart3, BrainCircuit, Check, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, LoaderCircle, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
+import { BarChart3, BrainCircuit, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -632,7 +632,7 @@ function Notebook(props: NotebookProps) {
         onRunAutoAgent={props.onRunAutoAgent}
         autoAgentStatus={autoAgentStatus}
       />
-      {dataset && <AutoAgentPanel steps={autoAgentSteps} status={autoAgentStatus} />}
+      {dataset && <AutoAgentPanel steps={autoAgentSteps} />}
       <SimpleWorkflowGuide
         dataset={dataset}
         pending={agentPending || autoPending}
@@ -1269,33 +1269,13 @@ function CommandWorkspace({
   );
 }
 
-function AutoAgentPanel({ steps, status }: { steps: AutoAgentStep[]; status: "idle" | "running" | "success" | "failed" }) {
+function AutoAgentPanel({ steps }: { steps: AutoAgentStep[] }) {
   const latestSuccess = [...steps].reverse().find((step) => step.status === "success" && step.task);
   const model = latestSuccess?.task?.execution.validation_report?.model as Record<string, any> | undefined;
   const metric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
-  const activeStep = steps.find((step) => step.status === "running");
-  const completedCount = steps.filter((step) => step.status === "success").length;
-  const heading = status === "running" ? "AI is thinking" : status === "success" ? "Workflow complete" : status === "failed" ? "Workflow stopped" : "AI workflow";
-  const summary = activeStep
-    ? `Working on ${activeStep.title}`
-    : status === "success"
-      ? "Data prepared, model evaluated, and predictions saved"
-      : status === "failed"
-        ? steps.find((step) => step.status === "failed")?.error ?? "A workflow step needs attention"
-        : "Ready";
   return (
     <section className="auto-agent-panel border-b border-line bg-notebook px-4 py-5" aria-live="polite">
       <div className="auto-agent-flow-shell w-full">
-        <div className={`auto-agent-thinking-row auto-agent-thinking-row-${status}`}>
-          <div className="auto-agent-thinking-mark" aria-hidden="true">
-            {status === "running" ? <LoaderCircle className="h-4 w-4" /> : status === "success" ? <Check className="h-4 w-4" /> : status === "failed" ? <XCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-          </div>
-          <div className="min-w-0">
-            <div className="auto-agent-flow-heading">{heading}</div>
-            <div className="auto-agent-flow-summary">{summary}</div>
-          </div>
-          <span className="auto-agent-progress-count">{completedCount}/{steps.length}</span>
-        </div>
         <div className="auto-agent-vertical" role="list" aria-label="AI workflow progress">
           {steps.map((step, index) => (
             <div

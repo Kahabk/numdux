@@ -476,37 +476,6 @@ textarea:focus-visible {
   margin-left: 0;
 }
 
-.auto-agent-thinking-row {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  border-bottom: 1px solid #292c31;
-  padding: 0 8px 12px;
-}
-
-.auto-agent-thinking-mark {
-  display: inline-flex;
-  height: 28px;
-  width: 28px;
-  align-items: center;
-  justify-content: center;
-  color: #b9c0e6;
-}
-
-.auto-agent-thinking-row-running .auto-agent-thinking-mark {
-  color: #e3e6ff;
-}
-
-.auto-agent-thinking-row-success .auto-agent-thinking-mark {
-  color: #d8dce3;
-}
-
-.auto-agent-thinking-row-failed .auto-agent-thinking-mark {
-  color: #d87c7c;
-}
-
 .shimmer-text {
   background: linear-gradient(
     90deg,
@@ -524,30 +493,8 @@ textarea:focus-visible {
   animation: shimmer 2s linear infinite;
 }
 
-.auto-agent-flow-heading {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.auto-agent-flow-summary {
-  margin-top: 2px;
-  overflow: hidden;
-  color: #8f969f;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.auto-agent-progress-count {
-  min-width: 38px;
-  color: #747c86;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 10px;
-  text-align: right;
-}
-
 .auto-agent-vertical {
-  padding: 12px 8px 4px;
+  padding: 0 8px 4px;
 }
 
 .auto-agent-flow-step {
@@ -1328,17 +1275,10 @@ textarea:focus-visible {
   --shimmer-soft: #303a4b;
   --shimmer-highlight: #111827;
 }
-.app-theme-light .auto-agent-thinking-row,
 .app-theme-light .auto-agent-step-content,
 .app-theme-light .auto-agent-result-strip { border-color: #e0e5ed; }
-.app-theme-light .auto-agent-thinking-mark {
-  background: transparent;
-  color: #536177;
-}
 .app-theme-light .auto-agent-step-label { color: #6a7485; }
 .app-theme-light .auto-agent-flow-step-success .auto-agent-step-label { color: #243149; }
-.app-theme-light .auto-agent-flow-summary,
-.app-theme-light .auto-agent-progress-count,
 .app-theme-light .auto-agent-step-state { color: #778297; }
 .app-theme-light .auto-agent-connector { background: #d8dee8; }
 
