@@ -69,7 +69,7 @@ class SandboxManager:
                 validation = {"status": "failed", "checks": [{"name": "cleaned_dataset_readable", "passed": False, "error": str(exc)}]}
         return (
             ExecutionResult(
-                status="success" if proc.returncode == 0 and cleaned.exists() else "failed",
+                status="success" if proc.returncode == 0 and cleaned.exists() and validation.get("status") != "failed" else "failed",
                 stdout=proc.stdout,
                 stderr=proc.stderr,
                 exit_code=proc.returncode,

@@ -97,7 +97,10 @@ def train_model_in_sandbox(storage_root: Path, dataset_path: Path, dataset_id: s
         features=features,
         task_type=task_type,
         model_type=payload.get("model_type", request.model_type),
-        hyperparameters=request.hyperparameters,
+        hyperparameters=payload.get("hyperparameters", request.hyperparameters),
+        filter_expression=payload.get("filter_expression", request.filter_expression),
+        use_pca=bool(payload.get("use_pca", request.use_pca)),
+        tune_hyperparameters=request.tune_hyperparameters,
         metrics=payload.get("metrics", {}),
         feature_importances=payload.get("feature_importances", []),
         training_time_seconds=float(payload.get("training_time_seconds", execution.duration_ms / 1000)),
@@ -116,6 +119,10 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
         "task_type": request.task_type,
         "model_type": request.model_type,
         "hyperparameters": request.hyperparameters,
+        "filter_expression": request.filter_expression,
+        "use_pca": request.use_pca,
+        "pca_components": request.pca_components,
+        "tune_hyperparameters": request.tune_hyperparameters,
     }
     return dedent(
         f"""
@@ -132,8 +139,9 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
         from sklearn.impute import SimpleImputer
         from sklearn.linear_model import LinearRegression, LogisticRegression
         from sklearn.metrics import accuracy_score, f1_score, mean_absolute_error, mean_squared_error, r2_score, roc_auc_score
-        from sklearn.model_selection import train_test_split
+        from sklearn.model_selection import GridSearchCV, train_test_split
         from sklearn.pipeline import Pipeline
+        from sklearn.decomposition import PCA
         from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
         CONFIG = {payload!r}
@@ -169,6 +177,12 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
 
         start = time.perf_counter()
         df = load_frame(INPUT_PATH)
+        filter_expression = str(CONFIG.get("filter_expression") or "").strip()
+        if filter_expression:
+            try:
+                df = df.query(filter_expression).copy()
+            except Exception as exc:
+                raise ValueError(f"Filter failed: {{exc}}") from exc
         target = CONFIG["target"]
         features = CONFIG["features"]
         data = df[features + [target]].dropna(subset=[target]).copy()
@@ -181,7 +195,13 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
 
         numeric_features = [column for column in X.columns if pd.api.types.is_numeric_dtype(X[column])]
         categorical_features = [column for column in X.columns if column not in numeric_features]
-        numeric_pipeline = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())])
+        numeric_steps = [("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())]
+        if CONFIG.get("use_pca") and numeric_features:
+            requested_components = CONFIG.get("pca_components")
+            max_components = max(1, min(len(numeric_features), len(X) - 1))
+            n_components = min(max_components, int(requested_components or min(3, max_components)))
+            numeric_steps.append(("pca", PCA(n_components=n_components, random_state=42)))
+        numeric_pipeline = Pipeline(numeric_steps)
         categorical_pipeline = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))])
         preprocessor = ColumnTransformer([("num", numeric_pipeline, numeric_features), ("cat", categorical_pipeline, categorical_features)])
         params = CONFIG["hyperparameters"]
@@ -204,19 +224,37 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
                 model = RandomForestRegressor(random_state=42, n_jobs=-1, **clean_params(params, {{"n_estimators", "max_depth", "min_samples_leaf"}}))
 
         pipeline = Pipeline([("preprocess", preprocessor), ("model", model)])
+        param_grid = {{}}
+        if CONFIG.get("tune_hyperparameters"):
+            if model_type == "random_forest":
+                param_grid = {{"model__n_estimators": [80, 140], "model__max_depth": [None, 6, 12]}}
+            elif model_type == "gradient_boosting":
+                param_grid = {{"model__n_estimators": [80, 140], "model__learning_rate": [0.05, 0.1], "model__max_depth": [2, 3]}}
+            elif model_type == "logistic_regression":
+                param_grid = {{"model__C": [0.3, 1.0, 3.0]}}
         stratify = y if task_type == "classification" and unique > 1 and unique <= 20 else None
         try:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=stratify)
         except Exception:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        pipeline.fit(X_train, y_train)
-        pred = pipeline.predict(X_test)
+        estimator = pipeline
+        if param_grid:
+            cv_splits = min(3, len(X_train))
+            if task_type == "classification":
+                class_counts = pd.Series(y_train).value_counts()
+                if len(class_counts):
+                    cv_splits = min(cv_splits, int(class_counts.min()))
+            if cv_splits >= 2:
+                estimator = GridSearchCV(pipeline, param_grid=param_grid, cv=cv_splits, scoring="accuracy" if task_type == "classification" else "r2", n_jobs=-1)
+        estimator.fit(X_train, y_train)
+        fitted_pipeline = estimator.best_estimator_ if hasattr(estimator, "best_estimator_") else estimator
+        pred = estimator.predict(X_test)
         metrics = {{}}
         if task_type == "classification":
             metrics["accuracy"] = float(accuracy_score(y_test, pred))
             metrics["f1"] = float(f1_score(y_test, pred, average="weighted", zero_division=0))
             try:
-                proba = pipeline.predict_proba(X_test)
+                proba = estimator.predict_proba(X_test)
                 if proba.shape[1] == 2:
                     metrics["auc"] = float(roc_auc_score(y_test, proba[:, 1]))
             except Exception:
@@ -226,8 +264,10 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
             metrics["mae"] = float(mean_absolute_error(y_test, pred))
             metrics["r2"] = float(r2_score(y_test, pred))
 
-        names = pipeline.named_steps["preprocess"].get_feature_names_out()
-        fitted_model = pipeline.named_steps["model"]
+        if hasattr(estimator, "best_score_"):
+            metrics["tuning_score"] = float(estimator.best_score_)
+        names = fitted_pipeline.named_steps["preprocess"].get_feature_names_out()
+        fitted_model = fitted_pipeline.named_steps["model"]
         if hasattr(fitted_model, "feature_importances_"):
             raw_importance = fitted_model.feature_importances_
         elif hasattr(fitted_model, "coef_"):
@@ -248,13 +288,15 @@ def generate_training_code(run_id: str, dataset_id: str, version_id: str, reques
             "features": features,
             "task_type": task_type,
             "model_type": model_type,
-            "hyperparameters": params,
+            "hyperparameters": dict(params, **(getattr(estimator, "best_params_", {{}}) or {{}})),
+            "filter_expression": filter_expression,
+            "use_pca": bool(CONFIG.get("use_pca")),
             "metrics": metrics,
             "feature_importances": feature_importances,
             "training_time_seconds": round(float(elapsed), 4),
             "created_at": datetime.utcnow().isoformat() + "Z",
         }}
-        joblib.dump(pipeline, OUTPUT_DIR / "model.joblib")
+        joblib.dump(estimator, OUTPUT_DIR / "model.joblib")
         df.to_parquet(OUTPUT_DIR / "cleaned.parquet", index=False)
         (OUTPUT_DIR / "model_run.json").write_text(json.dumps(result, indent=2, default=json_default))
         (OUTPUT_DIR / "validation_report.json").write_text(json.dumps({{"status": "passed", "model": result, "checks": [{{"name": "model_trained", "passed": True}}]}}, indent=2, default=json_default))

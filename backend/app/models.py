@@ -127,6 +127,10 @@ class ModelTrainingRequest(BaseModel):
     task_type: Literal["auto", "classification", "regression"] = "auto"
     model_type: Literal["logistic_regression", "linear_regression", "random_forest", "gradient_boosting"] = "random_forest"
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    filter_expression: str = ""
+    use_pca: bool = False
+    pca_components: int | None = Field(default=None, ge=1)
+    tune_hyperparameters: bool = False
 
 
 class ModelRunRecord(BaseModel):
@@ -138,6 +142,9 @@ class ModelRunRecord(BaseModel):
     task_type: Literal["classification", "regression"]
     model_type: str
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    filter_expression: str = ""
+    use_pca: bool = False
+    tune_hyperparameters: bool = False
     metrics: dict[str, float | None] = Field(default_factory=dict)
     feature_importances: list[dict[str, Any]] = Field(default_factory=list)
     training_time_seconds: float = 0.0

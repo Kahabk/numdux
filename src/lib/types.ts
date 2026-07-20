@@ -118,6 +118,10 @@ export type ModelTrainingRequest = {
   task_type: ModelTaskType;
   model_type: ModelType;
   hyperparameters: Record<string, unknown>;
+  filter_expression?: string;
+  use_pca?: boolean;
+  pca_components?: number | null;
+  tune_hyperparameters?: boolean;
 };
 export type ModelRunRecord = {
   id: string;
@@ -128,6 +132,9 @@ export type ModelRunRecord = {
   task_type: "classification" | "regression";
   model_type: ModelType;
   hyperparameters: Record<string, unknown>;
+  filter_expression?: string;
+  use_pca?: boolean;
+  tune_hyperparameters?: boolean;
   metrics: Record<string, number | null>;
   feature_importances: Array<{ feature: string; importance: number }>;
   training_time_seconds: number;

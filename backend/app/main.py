@@ -551,6 +551,14 @@ def sandbox_task_file(task_id: str, filename: str) -> FileResponse:
     output = run_dir / "output" / filename
     if not output.exists() or not output.is_file():
         raise HTTPException(status_code=404, detail="Task file not found")
+    media_types = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".svg": "image/svg+xml",
+    }
+    if output.suffix.lower() in media_types:
+        return FileResponse(output, media_type=media_types[output.suffix.lower()])
     return FileResponse(output, filename=filename)
 
 

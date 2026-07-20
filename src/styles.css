@@ -387,6 +387,362 @@ textarea:focus-visible {
   padding: 12px 14px 14px;
 }
 
+.simple-cell-stream {
+  border-top: 1px solid #2a2a2a;
+}
+
+.workflow-guide {
+  background: #101112;
+}
+
+.workflow-step-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.workflow-step-card {
+  display: grid;
+  min-height: 54px;
+  min-width: 0;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #30343a;
+  background: #15171a;
+  padding: 8px;
+  text-align: left;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.workflow-step-card:hover:not(:disabled) {
+  border-color: #6c8cff;
+  background: #181c24;
+}
+
+.workflow-step-card-active {
+  border-color: #6c8cff;
+  background: #151b29;
+}
+
+.workflow-step-card-complete {
+  border-color: #315640;
+  background: #101a14;
+}
+
+.workflow-step-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workflow-step-card-locked {
+  background: #101010;
+}
+
+.workflow-step-number {
+  display: inline-flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3f47;
+  background: #101216;
+  color: #b9c0c8;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.workflow-step-card-complete .workflow-step-number {
+  border-color: #315640;
+  background: #142118;
+  color: #79c18f;
+}
+
+.workflow-memory-box {
+  border: 1px solid #30343a;
+  background: #121416;
+  padding: 10px;
+}
+
+.auto-agent-panel {
+  --shimmer-dim: #888;
+  --shimmer-soft: #e6e8ed;
+  --shimmer-highlight: #fff;
+  background: #101112;
+}
+
+.auto-agent-flow-shell {
+  max-width: 620px;
+  margin-left: 0;
+}
+
+.auto-agent-thinking-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border-bottom: 1px solid #292c31;
+  padding: 0 8px 12px;
+}
+
+.auto-agent-thinking-mark {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  color: #b9c0e6;
+}
+
+.auto-agent-thinking-row-running .auto-agent-thinking-mark {
+  color: #e3e6ff;
+}
+
+.auto-agent-thinking-row-success .auto-agent-thinking-mark {
+  color: #d8dce3;
+}
+
+.auto-agent-thinking-row-failed .auto-agent-thinking-mark {
+  color: #d87c7c;
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--shimmer-dim) 25%,
+    var(--shimmer-soft) 40%,
+    var(--shimmer-highlight) 50%,
+    var(--shimmer-soft) 60%,
+    var(--shimmer-dim) 75%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
+}
+
+.auto-agent-flow-heading {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.auto-agent-flow-summary {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #8f969f;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auto-agent-progress-count {
+  min-width: 38px;
+  color: #747c86;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  text-align: right;
+}
+
+.auto-agent-vertical {
+  padding: 12px 8px 4px;
+}
+
+.auto-agent-flow-step {
+  position: relative;
+  display: grid;
+  min-height: 52px;
+  min-width: 0;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.auto-agent-step-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.auto-agent-step-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  background: #101112;
+  color: #747b84;
+  transition: color 240ms ease, filter 240ms ease, transform 240ms ease;
+}
+
+.auto-agent-flow-step-success .auto-agent-step-icon {
+  color: #c9ced6;
+}
+
+.auto-agent-flow-step-running .auto-agent-step-icon {
+  color: #e0e5ff;
+}
+
+.auto-agent-flow-step-failed .auto-agent-step-icon {
+  color: #d87c7c;
+}
+
+.auto-agent-connector {
+  position: absolute;
+  top: 28px;
+  bottom: -24px;
+  left: 50%;
+  width: 1px;
+  overflow: visible;
+  background: #2b2f35;
+  transform: translateX(-50%);
+}
+
+.auto-agent-flow-step-success .auto-agent-connector {
+  background: linear-gradient(#8b919b, #484d55);
+}
+
+.auto-agent-flow-step-running .auto-agent-connector {
+  background: #34394a;
+}
+
+.auto-agent-step-content {
+  display: flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 2px 10px 0;
+}
+
+.auto-agent-step-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 520;
+}
+
+.auto-agent-step-label {
+  color: #8f969f;
+}
+
+.auto-agent-flow-step-success .auto-agent-step-label {
+  color: #d1d6dc;
+}
+
+.auto-agent-step-state {
+  flex: none;
+  color: #676e77;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.auto-agent-flow-step-success .auto-agent-step-state {
+  color: #aeb4bd;
+}
+
+.auto-agent-flow-step-running .auto-agent-step-state {
+  color: #aab8ff;
+}
+
+.auto-agent-flow-step-failed .auto-agent-step-state,
+.auto-agent-flow-step-failed .auto-agent-step-label {
+  color: #d87c7c;
+}
+
+.auto-agent-result-strip {
+  margin: 8px 8px 0 38px;
+  padding-top: 10px;
+  border-top: 1px solid #292c31;
+}
+
+.plot-preview-shell {
+  border: 1px solid #30343a;
+  background: #101112;
+  padding: 10px;
+}
+
+.plot-generation-error {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgb(var(--bad) / 0.55);
+  background: rgb(var(--bad) / 0.08);
+  padding: 10px 12px;
+  color: rgb(var(--bad));
+  font-size: 12px;
+}
+
+.plot-generation-error span {
+  color: rgb(var(--muted));
+}
+
+.plot-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.artifact-plot {
+  min-width: 0;
+  border: 1px solid #2a2a2a;
+  background: #111;
+  padding: 8px;
+}
+
+.artifact-plot img {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+  max-height: 460px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.artifact-plot-placeholder {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  border: 1px dashed #30343a;
+  background: #0e0e0e;
+  color: #747474;
+  text-align: center;
+}
+
+.artifact-plot-placeholder span {
+  display: block;
+  color: #9a9a9a;
+  font-size: 12px;
+}
+
+.artifact-plot-placeholder small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.artifact-plot-missing {
+  opacity: 0.78;
+}
+
+.artifact-plot figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  color: #9a9a9a;
+  font-size: 11px;
+}
+
+.artifact-plot figcaption a {
+  color: #b9c0e6;
+}
+
 .graph-studio {
   display: grid;
   gap: 14px;
@@ -478,6 +834,38 @@ textarea:focus-visible {
   gap: 14px;
 }
 
+.model-flow-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.model-flow-step {
+  display: inline-flex;
+  min-height: 34px;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #30343a;
+  background: #15171a;
+  padding: 0 8px;
+  color: #b9c0c8;
+  font-size: 12px;
+}
+
+.model-flow-step span {
+  display: inline-flex;
+  height: 20px;
+  width: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3f47;
+  color: #f5f5f5;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+}
+
 .model-trainer,
 .model-leaderboard,
 .model-detail {
@@ -497,6 +885,33 @@ textarea:focus-visible {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.model-span-2 {
+  grid-column: span 2;
+}
+
+.model-input-with-icon {
+  position: relative;
+}
+
+.model-input-with-icon svg {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.model-input-with-icon .settings-input {
+  padding-left: 30px;
+}
+
+.model-score-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .model-form-grid select[multiple] {
@@ -531,14 +946,41 @@ textarea:focus-visible {
 }
 
 @media (max-width: 980px) {
+  .workflow-step-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auto-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plot-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .model-flow-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .model-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
+  .workflow-step-grid,
+  .auto-agent-grid,
+  .model-flow-strip,
+  .model-score-panel {
+    grid-template-columns: 1fr;
+  }
+
   .model-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .model-span-2 {
+    grid-column: auto;
   }
 }
 
@@ -590,6 +1032,11 @@ textarea:focus-visible {
 @keyframes agent-text-shine {
   0% { background-position: 180% 0; }
   100% { background-position: -80% 0; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
 }
 
 @keyframes agent-pulse {
@@ -874,6 +1321,33 @@ textarea:focus-visible {
 .app-theme-light textarea { background: #ffffff !important; color: #172033 !important; }
 .app-theme-light ::-webkit-scrollbar-track { background: #f4f6fa; }
 .app-theme-light ::-webkit-scrollbar-thumb { border-color: #f4f6fa; background: #c5cfdd; }
+.app-theme-light .auto-agent-panel,
+.app-theme-light .auto-agent-step-icon { background: #ffffff; }
+.app-theme-light .auto-agent-panel {
+  --shimmer-dim: #697386;
+  --shimmer-soft: #303a4b;
+  --shimmer-highlight: #111827;
+}
+.app-theme-light .auto-agent-thinking-row,
+.app-theme-light .auto-agent-step-content,
+.app-theme-light .auto-agent-result-strip { border-color: #e0e5ed; }
+.app-theme-light .auto-agent-thinking-mark {
+  background: transparent;
+  color: #536177;
+}
+.app-theme-light .auto-agent-step-label { color: #6a7485; }
+.app-theme-light .auto-agent-flow-step-success .auto-agent-step-label { color: #243149; }
+.app-theme-light .auto-agent-flow-summary,
+.app-theme-light .auto-agent-progress-count,
+.app-theme-light .auto-agent-step-state { color: #778297; }
+.app-theme-light .auto-agent-connector { background: #d8dee8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    color: var(--shimmer-highlight);
+  }
+}
 
 @media (max-width: 720px) {
   .visual-report-header, .report-section-heading { display: block; }

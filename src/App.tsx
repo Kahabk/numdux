@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Download, FileCode2, FileText, FileUp, KeyRound, Menu, Moon, RefreshCw, Save, Send, Settings, ShieldCheck, Sparkles, Sun, TestTube2, XCircle } from "lucide-react";
+import { BarChart3, BrainCircuit, Check, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, LoaderCircle, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -15,10 +15,116 @@ import { GraphStudio } from "./components/GraphStudio";
 import { LeftPanel } from "./components/LeftPanel";
 import { ManualNotebookCell, type ManualCellRecord } from "./components/ManualNotebookCell";
 import { ModelLab } from "./components/ModelLab";
-import { NotebookActionRow, type NotebookSandbox } from "./components/NotebookRows";
+import type { NotebookSandbox } from "./components/NotebookRows";
 import { ProfileCharts } from "./components/ProfileCharts";
 import { RightPanel } from "./components/RightPanel";
 import { VisualReport } from "./components/VisualReport";
+
+type WorkflowStepId = "clean" | "filter" | "pca" | "train" | "tune";
+
+type WorkflowMemoryEntry = {
+  stepId: WorkflowStepId;
+  taskId: string;
+  sandboxId: string;
+  status: SandboxTaskResult["execution"]["status"];
+  outputFiles: string[];
+  rows?: number;
+  instruction: string;
+};
+
+type SandboxMutationVariables = {
+  sandboxId: string;
+  prompt: string;
+  workflowStepId?: WorkflowStepId;
+};
+
+type AutoAgentStepStatus = "waiting" | "running" | "success" | "failed";
+
+type AutoAgentStep = {
+  id: string;
+  title: string;
+  prompt: string;
+  status: AutoAgentStepStatus;
+  task?: SandboxTaskResult;
+  versionId?: string;
+  error?: string;
+};
+
+const WORKFLOW_STEP_ORDER: WorkflowStepId[] = ["clean", "filter", "pca", "train", "tune"];
+
+const WORKFLOW_STEP_LABELS: Record<WorkflowStepId, string> = {
+  clean: "Clean",
+  filter: "Filter",
+  pca: "PCA",
+  train: "Train",
+  tune: "Tune"
+};
+
+const AUTO_AGENT_BLUEPRINT: Array<{ id: string; title: string; prompt: string; promote: boolean }> = [
+  {
+    id: "load_data",
+    title: "Load Data",
+    promote: false,
+    prompt: "Load the current dataset, verify schema, row count, columns, target candidates, missing values, duplicate rows, and write data_profile_summary.json."
+  },
+  {
+    id: "explore_data",
+    title: "Explore Data",
+    promote: false,
+    prompt: "Explore the current dataset. Summarize numeric and categorical columns, target candidates, missingness, duplicates, outliers, and data risks. Save inspection outputs."
+  },
+  {
+    id: "visualize_data",
+    title: "Visualize Data",
+    promote: false,
+    prompt: "Visualize the current dataset with histograms, pie chart, scatter plot, box plot, correlation heatmap, pair plot, and missingness. Save plots and review JSON."
+  },
+  {
+    id: "clean_data",
+    title: "Clean Data",
+    promote: true,
+    prompt: "Clean this dataset using the inspection metadata. Handle missing values, duplicates, invalid values, inconsistent categories, date formats, and defensible outlier handling. Save a validated cleaned dataset."
+  },
+  {
+    id: "feature_engineering",
+    title: "Engineer Features",
+    promote: true,
+    prompt: "Engineer model-ready features from the cleaned data. Select useful features, encode categorical variables, handle outliers left after cleaning, and save features.csv."
+  },
+  {
+    id: "prepare_data",
+    title: "Prepare Data (Encoding & Scaling)",
+    promote: true,
+    prompt: "Prepare data for modeling. Encode categorical features, scale numeric features, analyze variance/PCA when useful, and save prepared_features.csv, pca_features.csv, and pca_variance.json."
+  },
+  {
+    id: "split_data",
+    title: "Split Data",
+    promote: false,
+    prompt: "Split the prepared dataset into train and test sets. Preserve target distribution for classification when possible and save split_summary.json."
+  },
+  {
+    id: "train_model",
+    title: "Train Model",
+    promote: false,
+    prompt: "Train multiple suitable models. Identify classification or regression, include ensemble methods when appropriate, compare train/test scores, and avoid overfit."
+  },
+  {
+    id: "tune_evaluate",
+    title: "Tune & Evaluate",
+    promote: false,
+    prompt: "Tune hyperparameters, evaluate the best model, produce accuracy or regression score, confusion matrix for classification, feature importance, and model comparison."
+  },
+  {
+    id: "save_predict",
+    title: "Save and Predict",
+    promote: false,
+    prompt: "Save the best model artifact, create predictions.csv, model_accuracy_report.json, confusion matrix files when available, histograms, review plots, and final sandbox summary."
+  }
+];
+
+const EDA_PLOT_FILES = ["histograms.png", "pie_chart.png", "scatter_plot.png", "box_plot.png", "correlation_heatmap.png", "pair_plot.png", "missingness.png"];
+const MODEL_PLOT_FILES = ["model_comparison.png", "feature_importance.png", "confusion_matrix.png", "pca_variance.png", "prediction_review.png"];
 
 export function App() {
   const { dataset, datasets, run, versions, instruction, setDatasets, setDataset, setInstruction, setRun, addVersion, removeDataset, resetWorkspace } = useNotebookStore();
@@ -41,6 +147,9 @@ export function App() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [activeView, setActiveView] = useState<"notebook" | "settings">("notebook");
+  const [workflowMemory, setWorkflowMemory] = useState<WorkflowMemoryEntry[]>([]);
+  const [autoAgentSteps, setAutoAgentSteps] = useState<AutoAgentStep[]>(() => createAutoAgentSteps());
+  const [autoAgentStatus, setAutoAgentStatus] = useState<"idle" | "running" | "success" | "failed">("idle");
   const compact = useCompactLayout();
   const savedDatasets = useQuery({ queryKey: ["datasets"], queryFn: listDatasets });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealth, refetchInterval: 10000 });
@@ -62,11 +171,20 @@ export function App() {
     if (run?.generated_code.code) setCode(run.generated_code.code);
   }, [run?.run_id]);
 
+  useEffect(() => {
+    setWorkflowMemory([]);
+    setAutoAgentSteps(createAutoAgentSteps());
+    setAutoAgentStatus("idle");
+  }, [dataset?.dataset_id]);
+
   const upload = useMutation({
     mutationFn: uploadDataset,
     onSuccess: (payload) => {
       setDataset(payload);
       setCode("");
+      setWorkflowMemory([]);
+      setAutoAgentSteps(createAutoAgentSteps());
+      setAutoAgentStatus("idle");
       savedDatasets.refetch();
     }
   });
@@ -93,11 +211,19 @@ export function App() {
     onError: (error, { id }) => { updateManualCell(id, { status: "failed", output: error.message }); setExecutionStage("Failed"); }
   });
   const sandboxTask = useMutation({
-    mutationFn: ({ sandboxId, prompt }: { sandboxId: string; prompt: string }) => runSandboxTask(dataset!.dataset_id, sandboxId, prompt, dataset!.profile.version_id),
+    mutationFn: ({ sandboxId, prompt }: SandboxMutationVariables) => runSandboxTask(dataset!.dataset_id, sandboxId, prompt, dataset!.profile.version_id),
     onMutate: ({ sandboxId }) => setExecutionStage(`Running ${sandboxes.find((sandbox) => sandbox.id === sandboxId)?.name ?? "sandbox"} task`),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       setTaskResults((items) => ({ ...items, [result.sandbox_id]: result }));
       setExecutionStage(result.execution.status === "success" ? "Completed" : "Failed");
+      if (variables.workflowStepId && result.execution.status === "success") {
+        setWorkflowMemory((items) => {
+          const nextEntry = workflowMemoryEntryFromTask(variables.workflowStepId!, result);
+          return [...items.filter((item) => item.stepId !== variables.workflowStepId), nextEntry];
+        });
+        const nextStep = nextWorkflowStep(variables.workflowStepId);
+        if (nextStep) setInstruction(buildWorkflowPrompt(nextStep, [...workflowMemory, workflowMemoryEntryFromTask(variables.workflowStepId, result)], dataset));
+      }
     },
     onError: () => setExecutionStage("Failed")
   });
@@ -123,6 +249,9 @@ export function App() {
       setAnalysisPlan(null);
       setManualCells([]);
       setTaskResults({});
+      setWorkflowMemory([]);
+      setAutoAgentSteps(createAutoAgentSteps());
+      setAutoAgentStatus("idle");
       setSelectedCellId(null);
       setExecutionStage("Waiting");
       savedDatasets.refetch();
@@ -137,6 +266,9 @@ export function App() {
         setAnalysisPlan(null);
         setManualCells([]);
         setTaskResults({});
+        setWorkflowMemory([]);
+        setAutoAgentSteps(createAutoAgentSteps());
+        setAutoAgentStatus("idle");
         setSelectedCellId(null);
         setExecutionStage("Waiting");
       }
@@ -191,6 +323,64 @@ export function App() {
   function restartSandbox() {
     setSandboxes((items) => items.map((sandbox) => sandbox.id === activeSandboxId ? { ...sandbox, status: "ready" } : sandbox));
     setExecutionStage("Waiting");
+  }
+
+  function runNewSandboxTask(prompt: string, workflowStepId?: WorkflowStepId) {
+    const trimmed = prompt.trim();
+    if (!dataset || !trimmed || sandboxTask.isPending) return;
+    const id = `sandbox_${crypto.randomUUID().slice(0, 8)}`;
+    const name = workflowStepId ? WORKFLOW_STEP_LABELS[workflowStepId] : `Run ${Object.keys(taskResults).length + 1}`;
+    const agentPrompt = buildAgentPrompt(trimmed, Object.values(taskResults), workflowMemory, dataset);
+    setInstruction(agentPrompt);
+    setSandboxes((items) => [...items, { id, name, mode: "ephemeral", status: "ready" }]);
+    setActiveSandboxId(id);
+    sandboxTask.mutate({ sandboxId: id, prompt: agentPrompt, workflowStepId });
+  }
+
+  async function runAutoAgentPipeline() {
+    if (!dataset || autoAgentStatus === "running") return;
+    setAutoAgentStatus("running");
+    setAutoAgentSteps(createAutoAgentSteps());
+    setExecutionStage("Auto agent planning");
+    let currentDataset = dataset;
+    const completed: SandboxTaskResult[] = [];
+    try {
+      for (const blueprint of AUTO_AGENT_BLUEPRINT) {
+        const sandboxId = `auto_${blueprint.id}_${crypto.randomUUID().slice(0, 6)}`;
+        const prompt = buildAutoAgentPrompt(blueprint, currentDataset, completed);
+        setInstruction(prompt);
+        setSandboxes((items) => [...items, { id: sandboxId, name: blueprint.title, mode: "ephemeral", status: "ready" }]);
+        setActiveSandboxId(sandboxId);
+        setExecutionStage(`Auto agent: ${blueprint.title}`);
+        setAutoAgentSteps((steps) => steps.map((step) => step.id === blueprint.id ? { ...step, status: "running", prompt } : step));
+        const task = await runSandboxTask(currentDataset.dataset_id, sandboxId, prompt, currentDataset.profile.version_id);
+        setTaskResults((items) => ({ ...items, [task.sandbox_id]: task }));
+        completed.push(task);
+        if (task.execution.status !== "success") {
+          setAutoAgentSteps((steps) => steps.map((step) => step.id === blueprint.id ? { ...step, status: "failed", task, error: task.execution.stderr || "Sandbox step failed." } : step));
+          throw new Error(`${blueprint.title} failed.`);
+        }
+        let versionId: string | undefined;
+        if (blueprint.promote) {
+          const approved = await approveSandboxTask(currentDataset.dataset_id, task.task_id);
+          addVersion(approved.version);
+          versionId = approved.version.id;
+          currentDataset = await getDatasetVersion(currentDataset.dataset_id, versionId);
+          setDataset(currentDataset);
+          savedDatasets.refetch();
+        }
+        setAutoAgentSteps((steps) => steps.map((step) => step.id === blueprint.id ? { ...step, status: "success", task, versionId } : step));
+        await delay(450);
+      }
+      setAutoAgentStatus("success");
+      setExecutionStage("Auto agent completed");
+      setInstruction(buildAutoAgentFinalPrompt(completed, currentDataset));
+    } catch (error) {
+      setAutoAgentStatus("failed");
+      setExecutionStage("Auto agent failed");
+      const message = error instanceof Error ? error.message : "Auto agent failed.";
+      setAutoAgentSteps((steps) => steps.map((step) => step.status === "running" ? { ...step, status: "failed", error: message } : step));
+    }
   }
 
   const notebook = (
@@ -267,6 +457,11 @@ export function App() {
         sandboxTask.mutate({ sandboxId, prompt });
         setAgentPrompt("");
       }}
+      onRunNewSandboxTask={runNewSandboxTask}
+      workflowMemory={workflowMemory}
+      autoAgentSteps={autoAgentSteps}
+      autoAgentStatus={autoAgentStatus}
+      onRunAutoAgent={runAutoAgentPipeline}
       onApproveSandboxTask={(taskId) => approveTask.mutate({ taskId })}
       onStop={() => setExecutionStage("Cancelled")}
       onRestartSandbox={restartSandbox}
@@ -400,70 +595,237 @@ type NotebookProps = {
   onRemoveManualCell: (id: string) => void;
   onRunManualCell: (cell: ManualCellRecord) => void;
   onRunSandboxTask: (sandboxId: string, prompt: string) => void;
+  onRunNewSandboxTask: (prompt: string, workflowStepId?: WorkflowStepId) => void;
+  workflowMemory: WorkflowMemoryEntry[];
+  autoAgentSteps: AutoAgentStep[];
+  autoAgentStatus: "idle" | "running" | "success" | "failed";
+  onRunAutoAgent: () => void;
   onApproveSandboxTask: (taskId: string) => void;
   onStop: () => void;
   onRestartSandbox: () => void;
 };
 
 function Notebook(props: NotebookProps) {
-  const { dataset, run, code, instruction, upload, clean, executeCode, approve, healthStatus, providerStatus, isRefreshing, report, reportLoading, analysisPlan, planPending, agentPending, sandboxes, taskResults, taskError, approveTaskPendingId, approveTaskError, activeSandboxId, manualCells, selectedCellId, executionStage, reportPreview, appTheme, reportTheme, uploadInputRef } = props;
-  const [openSection, setOpenSection] = useState<string | null>("dataset-status");
-  const [artifactTab, setArtifactTab] = useState<"preview" | "schema" | "issues" | "compare" | "charts" | "graph" | "model" | "export">("preview");
-  const expandSection = (section: string) => {
-    setOpenSection((current) => current === section ? null : section);
-    window.setTimeout(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  };
+  const { dataset, instruction, upload, healthStatus, providerStatus, isRefreshing, agentPending, sandboxes, taskResults, taskError, approveTaskPendingId, approveTaskError, activeSandboxId, manualCells, selectedCellId, appTheme, uploadInputRef, workflowMemory, autoAgentSteps, autoAgentStatus } = props;
+  const autoPending = autoAgentStatus === "running";
   const activeSandbox = sandboxes.find((sandbox) => sandbox.id === activeSandboxId);
-  const selectedManualCell = manualCells.find((cell) => cell.id === selectedCellId);
   const taskList = Object.values(taskResults);
   const activeTask = taskResults[activeSandboxId] ?? (taskList.length ? taskList[taskList.length - 1] : undefined);
-  const reportPdfUrl = dataset ? `/api/datasets/${dataset.dataset_id}/report.pdf?version_id=${dataset.profile.version_id}&theme=${reportTheme}${run ? `&run_id=${run.run_id}` : ""}` : "";
   return (
     <main className="notebook-main h-full overflow-auto bg-notebook">
       <NotebookHeader theme={appTheme} onToggleTheme={props.onToggleAppTheme} />
-      <NotebookActionRow dataset={dataset} versions={dataset?.versions ?? []} activeVersionId={dataset?.profile.version_id} sandboxId={activeSandboxId} sandboxes={sandboxes} onVersionChange={props.onVersionChange} onSandboxChange={props.onSandboxChange} onUpload={() => uploadInputRef.current?.click()} onCreateSandbox={props.onCreateSandbox} onAddCell={props.onAddManualCell} onRun={() => selectedManualCell ? props.onRunManualCell(selectedManualCell) : props.onRunCode()} onStop={props.onStop} onRestart={props.onRestartSandbox} onAskAI={() => expandSection("pipeline-plan")} onCharts={() => setArtifactTab("charts")} onReport={() => { props.onShowReport(); expandSection("pipeline-report"); }} onExport={() => dataset && window.open(`/api/datasets/${dataset.dataset_id}/export?version_id=${dataset.profile.version_id}`, "_self")} />
-
-      <PipelineStepper
+      <CommandWorkspace
         dataset={dataset}
         upload={upload}
         uploadInputRef={uploadInputRef}
-        activeSandbox={activeSandbox}
-        activeVersionId={dataset?.profile.version_id}
         healthStatus={healthStatus}
         providerStatus={providerStatus}
         isRefreshing={isRefreshing}
-        executionStage={executionStage}
-        instruction={instruction}
-        onInstructionChange={props.onInstructionChange}
         onRefresh={props.onRefresh}
-        onRunSandboxTask={(prompt) => props.onRunSandboxTask(activeSandboxId, prompt)}
-        sandboxPending={agentPending}
-        task={activeTask}
-        taskError={taskError}
-        approvePending={activeTask ? approveTaskPendingId === activeTask.task_id : approve.isPending}
-        approveError={approveTaskError ?? approve.error?.message}
-        onApprove={() => activeTask ? props.onApproveSandboxTask(activeTask.task_id) : props.onApprove()}
-        run={run}
-        code={activeTask?.generated_code.code ?? code}
-        onCodeChange={props.onCodeChange}
-        onRunCode={props.onRunCode}
-        codePending={executeCode.isPending}
-        codeError={executeCode.error?.message}
-        report={report}
-        reportLoading={reportLoading}
-        reportPreview={reportPreview}
-        reportTheme={reportTheme}
-        reportPdfUrl={reportPdfUrl}
-        onShowReport={props.onShowReport}
-        onRefreshReport={props.onRefreshReport}
-        onToggleReportTheme={props.onToggleReportTheme}
+        sandbox={activeSandbox}
+        pending={agentPending || autoPending}
+        result={activeTask}
+        error={taskError}
+        command={instruction}
+        onCommandChange={props.onInstructionChange}
+        onRun={props.onRunNewSandboxTask}
+        onRunAutoAgent={props.onRunAutoAgent}
+        autoAgentStatus={autoAgentStatus}
       />
-
-      {dataset && <ArtifactTabs tab={artifactTab} onTabChange={setArtifactTab} dataset={dataset} report={report} reportPdfUrl={reportPdfUrl} onReportChanged={props.onRefreshReport} />}
-
-      {manualCells.map((cell) => <ManualNotebookCell key={cell.id} cell={cell} sandboxName={sandboxes.find((sandbox) => sandbox.id === cell.sandboxId)?.name ?? "Unassigned"} selected={selectedCellId === cell.id} onSelect={() => props.onSelectManualCell(cell.id)} onChange={(source) => props.onUpdateManualCell(cell.id, { source, status: "idle" })} onRun={() => props.onRunManualCell(cell)} onDuplicate={() => props.onAddManualCell(cell.type, cell.id)} onAddBelow={() => props.onAddManualCell("python", cell.id)} onToggleReport={() => props.onUpdateManualCell(cell.id, { includeInReport: !cell.includeInReport })} onDelete={() => props.onRemoveManualCell(cell.id)} />)}
+      {dataset && <AutoAgentPanel steps={autoAgentSteps} status={autoAgentStatus} />}
+      <SimpleWorkflowGuide
+        dataset={dataset}
+        pending={agentPending || autoPending}
+        result={activeTask}
+        memory={workflowMemory}
+        onUsePrompt={props.onInstructionChange}
+        onRunPrompt={props.onRunNewSandboxTask}
+      />
+      <div className="simple-cell-stream">
+        {taskList.map((task) => (
+          <TaskResultCell
+            key={task.task_id}
+            task={task}
+            sandboxName={sandboxes.find((sandbox) => sandbox.id === task.sandbox_id)?.name ?? task.sandbox_id}
+            datasetId={dataset?.dataset_id}
+            approvePending={approveTaskPendingId === task.task_id}
+            approveError={approveTaskError}
+            onApprove={() => props.onApproveSandboxTask(task.task_id)}
+          />
+        ))}
+        {manualCells.map((cell) => <ManualNotebookCell key={cell.id} cell={cell} sandboxName={sandboxes.find((sandbox) => sandbox.id === cell.sandboxId)?.name ?? "Unassigned"} selected={selectedCellId === cell.id} onSelect={() => props.onSelectManualCell(cell.id)} onChange={(source) => props.onUpdateManualCell(cell.id, { source, status: "idle" })} onRun={() => props.onRunManualCell(cell)} onDuplicate={() => props.onAddManualCell(cell.type, cell.id)} onAddBelow={() => props.onAddManualCell("python", cell.id)} onToggleReport={() => props.onUpdateManualCell(cell.id, { includeInReport: !cell.includeInReport })} onDelete={() => props.onRemoveManualCell(cell.id)} />)}
+      </div>
     </main>
   );
+}
+
+function SimpleWorkflowGuide({
+  dataset,
+  pending,
+  result,
+  memory,
+  onUsePrompt,
+  onRunPrompt
+}: {
+  dataset: UploadResponse | null;
+  pending: boolean;
+  result?: SandboxTaskResult;
+  memory: WorkflowMemoryEntry[];
+  onUsePrompt: (value: string) => void;
+  onRunPrompt: (prompt: string, workflowStepId?: WorkflowStepId) => void;
+}) {
+  const completedIds = new Set(memory.map((item) => item.stepId));
+  const activeStep = WORKFLOW_STEP_ORDER.find((step) => !completedIds.has(step)) ?? "tune";
+  const activePrompt = dataset ? buildWorkflowPrompt(activeStep, memory, dataset) : "";
+  return (
+    <section className="workflow-guide border-b border-line bg-notebook px-4 py-3">
+      <div className="mx-auto grid w-full max-w-4xl gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span className="font-medium text-ink">Saved workflow memory</span>
+          <span className="text-muted">{pending ? "Sandbox is running the current step." : dataset ? `Next step: ${WORKFLOW_STEP_LABELS[activeStep]}` : "Upload a dataset to start."}</span>
+        </div>
+        <div className="workflow-step-grid">
+          {WORKFLOW_STEP_ORDER.map((stepId, index) => {
+            const entry = memory.find((item) => item.stepId === stepId);
+            const complete = Boolean(entry);
+            const active = dataset && stepId === activeStep;
+            const locked = !dataset || (!complete && !active);
+            const prompt = buildWorkflowPrompt(stepId, memory, dataset);
+            return (
+              <button
+                key={stepId}
+                className={`${locked ? "workflow-step-card workflow-step-card-locked" : "workflow-step-card"} ${complete ? "workflow-step-card-complete" : ""} ${active ? "workflow-step-card-active" : ""}`}
+                disabled={locked || pending}
+                onClick={() => {
+                  onUsePrompt(prompt);
+                  onRunPrompt(prompt, stepId);
+                }}
+                title={locked ? "Finish the current step first" : prompt}
+                type="button"
+              >
+                <span className="workflow-step-number">{index + 1}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-ink">{WORKFLOW_STEP_LABELS[stepId]}</span>
+                  <span className="block truncate text-muted">{complete ? `saved ${entry?.taskId}` : active ? "run this next" : "waiting"}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {dataset && <div className="workflow-memory-box">
+          <div className="text-xs font-medium text-ink">What the AI will know next</div>
+          <div className="mt-1 text-xs text-muted">{memory.length ? workflowContextText(memory) : `${dataset.filename} is loaded and profiled. No step output saved yet.`}</div>
+          <button className="command-button mt-2 text-muted" disabled={pending} onClick={() => onUsePrompt(activePrompt)} type="button">Put next prompt in box</button>
+        </div>}
+      </div>
+    </section>
+  );
+}
+
+function workflowMemoryEntryFromTask(stepId: WorkflowStepId, task: SandboxTaskResult): WorkflowMemoryEntry {
+  return {
+    stepId,
+    taskId: task.task_id,
+    sandboxId: task.sandbox_id,
+    status: task.execution.status,
+    outputFiles: task.execution.generated_files,
+    rows: Number(task.execution.cleaned_metadata?.rows ?? 0) || undefined,
+    instruction: task.instruction
+  };
+}
+
+function nextWorkflowStep(stepId: WorkflowStepId) {
+  const index = WORKFLOW_STEP_ORDER.indexOf(stepId);
+  return WORKFLOW_STEP_ORDER[index + 1];
+}
+
+function workflowContextText(memory: WorkflowMemoryEntry[]) {
+  return memory
+    .map((item) => `${WORKFLOW_STEP_LABELS[item.stepId]} done in ${item.taskId}${item.rows ? ` with ${formatNumber(item.rows)} rows` : ""}${item.outputFiles.length ? `; saved ${item.outputFiles.join(", ")}` : ""}.`)
+    .join(" ");
+}
+
+function buildWorkflowPrompt(stepId: WorkflowStepId, memory: WorkflowMemoryEntry[], dataset: UploadResponse | null) {
+  const datasetLine = dataset ? `Dataset: ${dataset.filename}, ${formatNumber(dataset.profile.rows)} rows, ${formatNumber(dataset.profile.columns)} columns, version ${dataset.profile.version_id}.` : "Dataset is not uploaded yet.";
+  const contextLine = memory.length
+    ? `Saved context from previous steps: ${workflowContextText(memory)} Use these outputs as the current working state; do not repeat completed steps unless validation shows a problem.`
+    : "No previous workflow step has been completed yet.";
+  const requests: Record<WorkflowStepId, string> = {
+    clean: "Step 1 Clean: fix missing values, duplicate rows, invalid values, inconsistent text/category values, and date formats. Save a cleaned dataset and validation summary.",
+    filter: "Step 2 Filter: use the cleaned dataset from Step 1. Apply sensible row filters, remove invalid or extreme rows only when justified, and save the filtered dataset plus filter decisions.",
+    pca: "Step 3 PCA: use the filtered dataset from Step 2. Prepare numeric features, scale them, run PCA dimensionality reduction, keep the lowest useful number of components, and save the PCA feature table.",
+    train: "Step 4 Train: use the PCA/features output from Step 3. Train a suitable model, evaluate accuracy for classification or the best regression score, and show feature importance.",
+    tune: "Step 5 Tune: use the trained model setup from Step 4. Tune hyperparameters, compare tuned vs first model, and report the best accuracy or score."
+  };
+  return `${datasetLine}\n${contextLine}\n${requests[stepId]}`;
+}
+
+function buildAgentPrompt(prompt: string, tasks: SandboxTaskResult[], memory: WorkflowMemoryEntry[], dataset: UploadResponse | null) {
+  const text = prompt.toLowerCase();
+  const asksForAgentModel = ["clean", "train", "test", "accuracy", "acuracy", "current model", "curant model", "score"].some((token) => text.includes(token));
+  if (!asksForAgentModel) return prompt;
+  const latestModelTask = [...tasks].reverse().find((task) => {
+    const model = task.execution.validation_report?.model as Record<string, unknown> | undefined;
+    return model?.status === "success";
+  });
+  const model = latestModelTask?.execution.validation_report?.model as Record<string, any> | undefined;
+  const datasetLine = dataset ? `Dataset context: ${dataset.filename}, version ${dataset.profile.version_id}, ${formatNumber(dataset.profile.rows)} rows, ${formatNumber(dataset.profile.columns)} columns.` : "";
+  const memoryLine = memory.length ? `Workflow memory: ${workflowContextText(memory)}` : "Workflow memory: no saved step output yet.";
+  const modelLine = model
+    ? `Current model memory: task ${latestModelTask?.task_id}, target ${model.target}, model ${model.model}, metrics ${JSON.stringify(model.metrics)}. If the user asks for current model accuracy, report these metrics and retrain/test only when requested.`
+    : "Current model memory: no trained model has been saved yet. If accuracy is requested, clean the data, choose a reasonable target, train/test a model, and report the test accuracy or regression score.";
+  return `${datasetLine}\n${memoryLine}\n${modelLine}\nUser request: ${prompt}`;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function createAutoAgentSteps(): AutoAgentStep[] {
+  return AUTO_AGENT_BLUEPRINT.map((step) => ({ id: step.id, title: step.title, prompt: step.prompt, status: "waiting" }));
+}
+
+function buildAutoAgentPrompt(
+  blueprint: { id: string; title: string; prompt: string; promote: boolean },
+  dataset: UploadResponse,
+  completed: SandboxTaskResult[]
+) {
+  const context = completed.length
+    ? completed.map((task) => {
+      const model = task.execution.validation_report?.model as Record<string, any> | undefined;
+      const pca = model?.pca ?? task.execution.validation_report?.pca;
+      const metric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
+      return [
+        `${task.sandbox_id}/${task.task_id}`,
+        `workflow=${task.workflow.join("->")}`,
+        `files=${task.execution.generated_files.join(",") || "none"}`,
+        `rows=${task.execution.cleaned_metadata?.rows ?? "unknown"}`,
+        metric ? `model_metric=${metric.label}:${metric.value}` : "",
+        pca?.status === "success" ? `pca_variance=${Number(pca.cumulative_variance).toFixed(4)}` : "",
+      ].filter(Boolean).join("; ");
+    }).join("\n")
+    : "No prior sandbox output yet.";
+  return [
+    `AUTO_AGENT_STAGE_ID: ${blueprint.id}`,
+    `You are the staged Auto AI agent. Run only this stage: ${blueprint.title}.`,
+    `Current dataset version: ${dataset.profile.version_id}; file ${dataset.filename}; rows ${formatNumber(dataset.profile.rows)}; columns ${formatNumber(dataset.profile.columns)}; quality ${dataset.profile.data_quality_score}%.`,
+    `Previous sandbox outputs and memory:\n${context}`,
+    "Think step by step inside the code. Write auditable outputs, validation_report.json, execution_summary.json, and any requested review artifacts.",
+    ["train_model", "tune_evaluate", "save_predict"].includes(blueprint.id) ? "Do not skip validation. Do not choose an overfit model just because train score is high." : "Do not skip validation. Do not train a model in this stage.",
+    blueprint.prompt
+  ].join("\n");
+}
+
+function buildAutoAgentFinalPrompt(tasks: SandboxTaskResult[], dataset: UploadResponse) {
+  const finalTask = [...tasks].reverse().find((task) => task.execution.validation_report?.model);
+  const model = finalTask?.execution.validation_report?.model as Record<string, any> | undefined;
+  const metric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
+  return [
+    `Auto agent finished on dataset version ${dataset.profile.version_id}.`,
+    metric ? `Best current model: ${model?.model} on target ${model?.target}; ${metric.label} ${metric.value}; overfit gap ${model?.overfit_gap == null ? "-" : Number(model.overfit_gap).toFixed(4)}.` : "No final model metric was found.",
+    `Generated steps: ${tasks.map((task) => task.sandbox_id).join(" -> ")}.`,
+    "Review the result cells below for cleaned data, generated files, plots, prediction review, and accuracy report."
+  ].join("\n");
 }
 
 function PipelineStepper({
@@ -820,7 +1182,9 @@ function CommandWorkspace({
   error,
   command,
   onCommandChange,
-  onRun
+  onRun,
+  onRunAutoAgent,
+  autoAgentStatus
 }: {
   dataset: UploadResponse | null;
   upload: UseMutationResult<UploadResponse, Error, File, unknown>;
@@ -836,6 +1200,8 @@ function CommandWorkspace({
   command: string;
   onCommandChange: (value: string) => void;
   onRun: (prompt: string) => void;
+  onRunAutoAgent: () => void;
+  autoAgentStatus: "idle" | "running" | "success" | "failed";
 }) {
   const trimmedCommand = command.trim();
   return (
@@ -882,6 +1248,16 @@ function CommandWorkspace({
               <Send className="h-3.5 w-3.5" />
               {pending ? <ThinkingPill compact /> : "Run"}
             </button>
+            <button
+              className="command-button text-muted"
+              disabled={!dataset || pending}
+              onClick={onRunAutoAgent}
+              title="Run the full staged agent pipeline"
+              type="button"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {autoAgentStatus === "running" ? "AI working" : "Run AI workflow"}
+            </button>
           </div>
         </div>
         {(pending || result) && <AgentTimeline stages={result?.workflow.length ? result.workflow : ["planning", "preprocessing", "execution", "validation"]} pending={pending} result={result} />}
@@ -891,6 +1267,82 @@ function CommandWorkspace({
       </div>
     </section>
   );
+}
+
+function AutoAgentPanel({ steps, status }: { steps: AutoAgentStep[]; status: "idle" | "running" | "success" | "failed" }) {
+  const latestSuccess = [...steps].reverse().find((step) => step.status === "success" && step.task);
+  const model = latestSuccess?.task?.execution.validation_report?.model as Record<string, any> | undefined;
+  const metric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
+  const activeStep = steps.find((step) => step.status === "running");
+  const completedCount = steps.filter((step) => step.status === "success").length;
+  const heading = status === "running" ? "AI is thinking" : status === "success" ? "Workflow complete" : status === "failed" ? "Workflow stopped" : "AI workflow";
+  const summary = activeStep
+    ? `Working on ${activeStep.title}`
+    : status === "success"
+      ? "Data prepared, model evaluated, and predictions saved"
+      : status === "failed"
+        ? steps.find((step) => step.status === "failed")?.error ?? "A workflow step needs attention"
+        : "Ready";
+  return (
+    <section className="auto-agent-panel border-b border-line bg-notebook px-4 py-5" aria-live="polite">
+      <div className="auto-agent-flow-shell w-full">
+        <div className={`auto-agent-thinking-row auto-agent-thinking-row-${status}`}>
+          <div className="auto-agent-thinking-mark" aria-hidden="true">
+            {status === "running" ? <LoaderCircle className="h-4 w-4" /> : status === "success" ? <Check className="h-4 w-4" /> : status === "failed" ? <XCircle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0">
+            <div className="auto-agent-flow-heading">{heading}</div>
+            <div className="auto-agent-flow-summary">{summary}</div>
+          </div>
+          <span className="auto-agent-progress-count">{completedCount}/{steps.length}</span>
+        </div>
+        <div className="auto-agent-vertical" role="list" aria-label="AI workflow progress">
+          {steps.map((step, index) => (
+            <div
+              key={step.id}
+              className={`auto-agent-flow-step auto-agent-flow-step-${step.status}`}
+              role="listitem"
+              aria-current={step.status === "running" ? "step" : undefined}
+            >
+              <div className="auto-agent-step-rail" aria-hidden="true">
+                <div className="auto-agent-step-icon">
+                  <AutoAgentIcon stepId={step.id} />
+                </div>
+                {index < steps.length - 1 && <span className="auto-agent-connector" />}
+              </div>
+              <div className="auto-agent-step-content">
+                <span className={step.status === "running" ? "auto-agent-step-label shimmer-text" : "auto-agent-step-label"}>{step.title}</span>
+                <span className="auto-agent-step-state">
+                  {step.status === "running" ? "processing" : step.status === "success" ? step.versionId ? `saved ${step.versionId}` : "done" : step.status === "failed" ? "failed" : ""}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {model?.status === "success" && <div className="auto-agent-result-strip metric-grid">
+          <Metric label={metric?.label ?? "score"} value={metric?.value ?? "-"} />
+          <Metric label="Best model" value={model.model ?? "-"} />
+          <Metric label="Target" value={model.target ?? "-"} />
+          <Metric label="Overfit gap" value={model.overfit_gap == null ? "-" : Number(model.overfit_gap).toFixed(4)} />
+        </div>}
+      </div>
+    </section>
+  );
+}
+
+function AutoAgentIcon({ stepId }: { stepId: string }) {
+  const className = "h-[18px] w-[18px]";
+  if (stepId === "load_data") return <Database className={className} />;
+  if (stepId === "explore_data") return <Search className={className} />;
+  if (stepId === "visualize_data") return <BarChart3 className={className} />;
+  if (stepId === "clean_data") return <Filter className={className} />;
+  if (stepId === "feature_engineering") return <WandSparkles className={className} />;
+  if (stepId === "prepare_data") return <SlidersHorizontal className={className} />;
+  if (stepId === "split_data") return <Layers3 className={className} />;
+  if (stepId === "train_model") return <BrainCircuit className={className} />;
+  if (stepId === "tune_evaluate") return <Gauge className={className} />;
+  if (stepId === "save_predict") return <Download className={className} />;
+  return <GitBranch className={className} />;
 }
 
 function AgentCommandCenter({
@@ -1004,20 +1456,37 @@ function TaskResultCell({
   const model = task.execution.validation_report?.model as Record<string, any> | undefined;
   const featureImportance = Array.isArray(model?.feature_importance) ? model.feature_importance as Array<{ feature: string; importance: number }> : [];
   const predictionPreview = Array.isArray(model?.predictions_preview) ? model.predictions_preview as Record<string, unknown>[] : [];
+  const modelMetric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
+  const plotFiles = task.execution.generated_files.filter((file) => file.endsWith(".png"));
+  const shouldShowEdaPlots = task.workflow.some((step) => ["inspect_data", "explore_data", "visualize_data", "clean_and_preprocess", "feature_engineering", "prepare_data", "train_model", "evaluate_model"].includes(step)) || plotFiles.some((file) => EDA_PLOT_FILES.includes(file));
+  const shouldShowModelPlots = task.workflow.some((step) => ["train_model", "evaluate_model", "generate_predictions"].includes(step)) || plotFiles.some((file) => MODEL_PLOT_FILES.includes(file));
+  const edaPlotFiles = shouldShowEdaPlots ? EDA_PLOT_FILES.filter((file) => plotFiles.includes(file)) : [];
+  const modelPlotFiles = shouldShowModelPlots ? MODEL_PLOT_FILES.filter((file) => plotFiles.includes(file)) : [];
+  const expectedEdaPlotsMissing = shouldShowEdaPlots && edaPlotFiles.length === 0;
+  const extraFiles = task.execution.generated_files.filter((file) => !["cleaned.csv", "features.csv", "predictions.csv", "model_accuracy_report.json"].includes(file) && !file.endsWith(".parquet") && !file.endsWith(".png"));
+  const [draftCode, setDraftCode] = useState(task.generated_code.code);
   return (
-    <Cell type="sandbox" title={`Task: ${task.instruction}`} status={task.execution.status} sandbox={sandboxName} defaultCollapsed>
+    <Cell type="sandbox" title={`${sandboxName}: ${task.workflow.join(" -> ")}`} status={task.execution.status} sandbox={sandboxName}>
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
         <div className="space-y-2 text-xs">
           <Metric label="Workflow" value={task.workflow.join(" -> ")} />
           <Metric label="Local dataset" value={task.local_dataset_path} />
           <Metric label="Generated files" value={task.execution.generated_files.join(", ") || "None"} />
           {model && <Metric label="Model" value={`${model.model ?? model.status}${model.target ? ` · target ${model.target}` : ""}`} />}
+          {model?.status === "success" && <div className="metric-grid">
+            <Metric label={modelMetric?.label ?? "score"} value={modelMetric?.value ?? "-"} />
+            <Metric label="Target" value={model.target ?? "-"} />
+            <Metric label="Train rows" value={formatNumber(Number(model.rows_train ?? 0))} />
+            <Metric label="Test rows" value={formatNumber(Number(model.rows_test ?? 0))} />
+          </div>}
           {model?.metrics && <pre className="max-h-40 overflow-auto border border-line bg-base p-2 font-mono text-muted">{JSON.stringify(model.metrics, null, 2)}</pre>}
           <div className="flex flex-wrap gap-2 pt-1">
             {datasetId && <button className="success-button" disabled={task.execution.status !== "success" || approvePending} onClick={onApprove} type="button"><ShieldCheck className="h-3.5 w-3.5" />{approvePending ? "Approving..." : "Approve as version"}</button>}
             <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/cleaned.csv`}><Download className="h-3.5 w-3.5" />Cleaned CSV</a>
             <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/features.csv`}><Download className="h-3.5 w-3.5" />Features</a>
+            {task.execution.generated_files.includes("model_accuracy_report.json") && <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/model_accuracy_report.json`}><Download className="h-3.5 w-3.5" />Accuracy report</a>}
             {task.execution.generated_files.includes("predictions.csv") && <a className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/predictions.csv`}><Download className="h-3.5 w-3.5" />Predictions</a>}
+            {extraFiles.map((file) => <a key={file} className="command-button text-muted" href={`/api/sandbox-tasks/${task.task_id}/files/${file}`}><Download className="h-3.5 w-3.5" />{file}</a>)}
             {approveError && <span className="self-center text-bad">{approveError}</span>}
           </div>
         </div>
@@ -1038,10 +1507,74 @@ function TaskResultCell({
         </div>
       </div>
       {featureImportance.length > 0 && <ModelBars items={featureImportance} />}
+      {expectedEdaPlotsMissing && (
+        <div className="plot-generation-error mt-3" role="alert">
+          <strong>EDA plots were not generated by this sandbox run.</strong>
+          <span>The backend returned no PNG artifacts. Restart the backend and rerun this step; an EDA run must return real files before it can pass.</span>
+        </div>
+      )}
+      {edaPlotFiles.length > 0 && <PlotPreview title="EDA plot preview" taskId={task.task_id} files={edaPlotFiles} />}
+      {modelPlotFiles.length > 0 && <PlotPreview title="Model plot preview" taskId={task.task_id} files={modelPlotFiles} />}
       {task.execution.preview_rows.length > 0 && <div className="mt-3"><div className="mb-2 text-xs text-muted">Cleaned output preview</div><DataTable rows={task.execution.preview_rows} /></div>}
       {predictionPreview.length > 0 && <div className="mt-3"><div className="mb-2 text-xs text-muted">Prediction sample</div><DataTable rows={predictionPreview} /></div>}
+      <details className="mt-3 border border-line bg-base p-2 text-xs">
+        <summary className="cursor-pointer text-muted">Generated code</summary>
+        <div className="mt-2">
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+            <span className="text-muted">Sandbox code</span>
+            <span className="font-mono text-muted">{task.generated_code.engine}</span>
+          </div>
+          <Editor height="320px" defaultLanguage="python" value={draftCode} onChange={(value) => setDraftCode(value ?? "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 12, lineNumbersMinChars: 3, scrollBeyondLastLine: false, wordWrap: "on", padding: { top: 12 } }} />
+        </div>
+      </details>
     </Cell>
   );
+}
+
+function PlotPreview({ title, taskId, files }: { title: string; taskId: string; files: string[] }) {
+  return (
+    <div className="plot-preview-shell mt-3">
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-ink">{title}</span>
+        <span className="text-muted">{files.length} plots</span>
+      </div>
+      <div className="plot-preview-grid">
+        {files.map((file) => (
+          <PlotImage key={file} taskId={taskId} file={file} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlotImage({ taskId, file }: { taskId: string; file: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <figure className={failed ? "artifact-plot artifact-plot-missing" : "artifact-plot"}>
+      {failed ? (
+        <div className="artifact-plot-placeholder">
+          <span>{plotLabel(file)}</span>
+          <small>the generated file could not be loaded</small>
+        </div>
+      ) : (
+        <img src={`/api/sandbox-tasks/${taskId}/files/${file}`} alt={file} loading="lazy" onError={() => setFailed(true)} />
+      )}
+      <figcaption>
+        <span>{plotLabel(file)}</span>
+        <a href={`/api/sandbox-tasks/${taskId}/files/${file}`} target="_blank" rel="noreferrer">open</a>
+      </figcaption>
+    </figure>
+  );
+}
+
+function plotLabel(file: string) {
+  return file.replace(".png", "").split("_").join(" ");
+}
+
+function taskModelMetric(metrics: Record<string, number | null>) {
+  const label = metrics.accuracy != null ? "accuracy" : metrics.r2 != null ? "r2" : metrics.mae != null ? "mae" : Object.keys(metrics)[0] ?? "score";
+  const value = metrics[label];
+  return { label, value: value == null ? "-" : Number(value).toFixed(4) };
 }
 
 function ModelBars({ items }: { items: Array<{ feature: string; importance: number }> }) {

@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BrainCircuit, Play, RefreshCw } from "lucide-react";
+import { BrainCircuit, Filter, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { listModelRuns, trainModel } from "../lib/api";
 import type { ModelRunRecord, ModelTaskType, ModelType, UploadResponse } from "../lib/types";
@@ -19,15 +19,23 @@ export function ModelLab({ dataset }: { dataset: UploadResponse }) {
   const [nEstimators, setNEstimators] = useState(120);
   const [maxDepth, setMaxDepth] = useState("");
   const [learningRate, setLearningRate] = useState("0.1");
+  const [filterExpression, setFilterExpression] = useState("");
+  const [usePca, setUsePca] = useState(false);
+  const [pcaComponents, setPcaComponents] = useState("3");
+  const [tuneHyperparameters, setTuneHyperparameters] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const runs = useQuery({ queryKey: ["model-runs", dataset.dataset_id], queryFn: () => listModelRuns(dataset.dataset_id) });
   const train = useMutation({
-    mutationFn: () => trainModel(dataset.dataset_id, dataset.profile.version_id, {
+    mutationFn: (options?: { tune?: boolean }) => trainModel(dataset.dataset_id, dataset.profile.version_id, {
       target,
       features: autoFeatures ? "auto" : features,
       task_type: taskType,
       model_type: modelType,
       hyperparameters: hyperparameters(modelType, nEstimators, maxDepth, learningRate),
+      filter_expression: filterExpression.trim(),
+      use_pca: usePca,
+      pca_components: usePca ? Math.max(1, Number(pcaComponents) || 3) : null,
+      tune_hyperparameters: options?.tune ?? tuneHyperparameters,
     }),
     onSuccess: (run) => {
       setSelectedRunId(run.id);
@@ -37,6 +45,7 @@ export function ModelLab({ dataset }: { dataset: UploadResponse }) {
   const sortedRuns = useMemo(() => [...(runs.data ?? [])].sort((a, b) => keyMetricValue(b) - keyMetricValue(a)), [runs.data]);
   const selectedRun = sortedRuns.find((run) => run.id === selectedRunId) ?? sortedRuns[0] ?? train.data;
   const status = train.isPending ? "running" : train.error ? "failed" : train.data ? "success" : "idle";
+  const numericColumnCount = dataset.profile.column_metadata.filter((column) => column.inferred_type === "number" || column.inferred_type === "integer" || column.original_type.includes("float") || column.original_type.includes("int")).length;
 
   function updateTarget(nextTarget: string) {
     setTarget(nextTarget);
@@ -45,20 +54,34 @@ export function ModelLab({ dataset }: { dataset: UploadResponse }) {
 
   return (
     <div className="model-lab">
+      <div className="model-flow-strip">
+        {["Clean", "Filter", "PCA", "Train", "Accuracy", "Tune"].map((step, index) => <div key={step} className="model-flow-step"><span>{index + 1}</span>{step}</div>)}
+      </div>
       <div className="model-trainer">
         <div className="model-lab-heading"><BrainCircuit className="h-4 w-4 text-accent" /><div><div className="text-sm font-medium text-ink">Model Lab</div><div className="text-xs text-muted">Training uses immutable version {headVersionId} and local sandbox execution.</div></div></div>
+        {selectedRun && <div className="model-score-panel">
+          <MetricMini label={keyMetricLabel(selectedRun)} value={displayMetricValue(selectedRun)} />
+          <MetricMini label="model" value={selectedRun.model_type.split("_").join(" ")} />
+          <MetricMini label="rows filter" value={selectedRun.filter_expression || filterExpression || "none"} />
+          <MetricMini label="PCA" value={selectedRun.use_pca ? "on" : usePca ? "ready" : "off"} />
+        </div>}
         <div className="model-form-grid">
           <label className="settings-field"><span>Target</span><select className="settings-input" value={target} onChange={(event) => updateTarget(event.target.value)}>{columns.map((column) => <option key={column} value={column}>{column}</option>)}</select></label>
           <label className="settings-field"><span>Task type</span><select className="settings-input" value={taskType} onChange={(event) => setTaskType(event.target.value as ModelTaskType)}>{TASK_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="settings-field"><span>Model</span><select className="settings-input" value={modelType} onChange={(event) => setModelType(event.target.value as ModelType)}>{MODEL_TYPES.map((item) => <option key={item} value={item}>{item.split("_").join(" ")}</option>)}</select></label>
           <label className="settings-field"><span>Features</span><select className="settings-input" multiple disabled={autoFeatures} value={features} onChange={(event) => setFeatures(Array.from(event.target.selectedOptions).map((option) => option.value))}>{columns.filter((column) => column !== target).map((column) => <option key={column} value={column}>{column}</option>)}</select></label>
           <label className="settings-field model-checkbox"><span>Auto features</span><input type="checkbox" checked={autoFeatures} onChange={(event) => { setAutoFeatures(event.target.checked); if (event.target.checked) setFeatures(columns.filter((column) => column !== target)); }} /></label>
+          <label className="settings-field model-span-2"><span>Filter rows</span><div className="model-input-with-icon"><Filter className="h-3.5 w-3.5 text-muted" /><input className="settings-input" value={filterExpression} onChange={(event) => setFilterExpression(event.target.value)} placeholder="age > 30 and country == 'US'" /></div></label>
+          <label className="settings-field model-checkbox"><span>Use PCA</span><input type="checkbox" checked={usePca} disabled={numericColumnCount < 2} onChange={(event) => setUsePca(event.target.checked)} /></label>
+          <label className="settings-field"><span>PCA dims</span><input className="settings-input" type="number" min={1} max={Math.max(1, numericColumnCount)} value={pcaComponents} onChange={(event) => setPcaComponents(event.target.value)} disabled={!usePca} /></label>
           <label className="settings-field"><span>Estimators</span><input className="settings-input" type="number" value={nEstimators} onChange={(event) => setNEstimators(Number(event.target.value))} disabled={!["random_forest", "gradient_boosting"].includes(modelType)} /></label>
           <label className="settings-field"><span>Max depth</span><input className="settings-input" value={maxDepth} onChange={(event) => setMaxDepth(event.target.value)} placeholder="auto" disabled={!["random_forest", "gradient_boosting"].includes(modelType)} /></label>
           <label className="settings-field"><span>Learning rate</span><input className="settings-input" value={learningRate} onChange={(event) => setLearningRate(event.target.value)} disabled={modelType !== "gradient_boosting"} /></label>
+          <label className="settings-field model-checkbox"><span>Auto tune</span><input type="checkbox" checked={tuneHyperparameters} onChange={(event) => setTuneHyperparameters(event.target.checked)} /></label>
         </div>
         <div className="model-status-row">
-          <button className="primary-button" disabled={!target || train.isPending} onClick={() => train.mutate()} type="button"><Play className="h-3.5 w-3.5" />{train.isPending ? "Training..." : "Train model"}</button>
+          <button className="primary-button" disabled={!target || train.isPending} onClick={() => train.mutate({ tune: false })} type="button"><Play className="h-3.5 w-3.5" />{train.isPending ? "Training..." : "Train model"}</button>
+          <button className="command-button text-muted" disabled={!target || train.isPending || modelType === "linear_regression"} onClick={() => train.mutate({ tune: true })} type="button"><SlidersHorizontal className="h-3.5 w-3.5" />Tune and train</button>
           <button className="command-button text-muted" disabled={runs.isFetching} onClick={() => runs.refetch()} type="button"><RefreshCw className={runs.isFetching ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />Refresh</button>
           <span className={`pipeline-status ${status === "success" ? "pipeline-status-ok" : status === "failed" ? "pipeline-status-bad" : status === "running" ? "pipeline-status-neutral" : "pipeline-status-muted"}`}>{status}</span>
         </div>
@@ -117,4 +140,10 @@ function keyMetricValue(run: ModelRunRecord) {
   const value = run.metrics[label];
   if (value == null) return Number.NEGATIVE_INFINITY;
   return label === "rmse" || label === "mae" ? -Number(value) : Number(value);
+}
+
+function displayMetricValue(run: ModelRunRecord) {
+  const label = keyMetricLabel(run);
+  const value = run.metrics[label];
+  return value == null ? "-" : Number(value).toFixed(4);
 }

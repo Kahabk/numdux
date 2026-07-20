@@ -18,6 +18,8 @@ ALLOWED_IMPORTS = {
     "math",
     "hashlib",
     "joblib",
+    "matplotlib",
+    "seaborn",
     "time",
 }
 
