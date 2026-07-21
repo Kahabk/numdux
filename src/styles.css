@@ -465,8 +465,8 @@ textarea:focus-visible {
 }
 
 .auto-agent-panel {
-  --shimmer-dim: #888;
-  --shimmer-soft: #e6e8ed;
+  --shimmer-dim: #4d535d;
+  --shimmer-soft: #b8c2dd;
   --shimmer-highlight: #fff;
   background: #101112;
 }
@@ -590,11 +590,49 @@ textarea:focus-visible {
 }
 
 .auto-agent-flow-step-success .auto-agent-step-state {
-  color: #aeb4bd;
+  color: #ffffff;
 }
 
 .auto-agent-flow-step-running .auto-agent-step-state {
-  color: #aab8ff;
+  color: #35363b;
+}
+
+.auto-agent-mini-loop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.auto-agent-mini-loop span {
+  display: inline-flex;
+  min-height: 18px;
+  align-items: center;
+  border: 1px solid #252a38;
+  background:
+    linear-gradient(90deg, #6f7898 0%, #f6f8ff 45%, #8ea2ff 55%, #545d79 100%)
+    #12151d;
+  background-size: 220% 100%;
+  padding: 0 6px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: loop-chip-shine 1.35s linear infinite;
+}
+
+.auto-agent-mini-loop span:nth-child(2) {
+  animation-delay: 140ms;
+}
+
+.auto-agent-mini-loop span:nth-child(3) {
+  animation-delay: 280ms;
+}
+
+.auto-agent-mini-loop span:nth-child(4) {
+  animation-delay: 420ms;
 }
 
 .auto-agent-flow-step-failed .auto-agent-step-state,
@@ -626,6 +664,141 @@ textarea:focus-visible {
 
 .plot-generation-error span {
   color: rgb(var(--muted));
+}
+
+.feature-loop-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #30343a;
+  background: #101112;
+  padding: 10px;
+}
+
+.feature-loop-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.feature-loop-head > span {
+  flex: none;
+  color: #7781a5;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.feature-loop-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.feature-loop-card {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #292c31;
+  background: #141619;
+  padding: 9px;
+}
+
+.feature-loop-card-selected {
+  border-color: #5f72c8;
+  background: #161a27;
+  box-shadow: inset 0 0 0 1px rgba(142, 162, 255, 0.12);
+}
+
+.feature-loop-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feature-loop-pass {
+  color: #7d8490;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.feature-loop-card-selected .feature-loop-pass,
+.feature-loop-card-selected .feature-loop-name {
+  background: linear-gradient(90deg, #5d667b 0%, #f7f9ff 45%, #9db0ff 55%, #5d667b 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: loop-chip-shine 1.55s linear infinite;
+}
+
+.feature-loop-badge {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #343943;
+  padding: 0 7px;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.feature-loop-badge-ok {
+  color: #5f946f;
+}
+
+.feature-loop-badge-warn {
+  color: #aa7f43;
+}
+
+.feature-loop-name {
+  color: #9ca4af;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.feature-loop-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.feature-loop-metrics span {
+  min-width: 0;
+  border: 1px solid #242830;
+  background: #0f1012;
+  padding: 5px 6px;
+  color: #8f969f;
+  font-size: 10px;
+}
+
+.feature-loop-metrics strong {
+  display: block;
+  overflow: hidden;
+  color: #c2c8d1;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-loop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.feature-loop-actions span {
+  border: 1px solid #28333c;
+  background: #121b20;
+  padding: 3px 6px;
+  color: #b9c0c8;
+  font-size: 10px;
+}
+
+.feature-loop-card p {
+  margin: 0;
+  color: #9ba3ad;
+  font-size: 11px;
 }
 
 .plot-preview-grid {
@@ -912,6 +1085,10 @@ textarea:focus-visible {
   .model-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .feature-loop-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -984,6 +1161,11 @@ textarea:focus-visible {
 @keyframes shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
+}
+
+@keyframes loop-chip-shine {
+  from { background-position: 220% 0; }
+  to { background-position: -220% 0; }
 }
 
 @keyframes agent-pulse {

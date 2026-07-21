@@ -1,7 +1,7 @@
 import Editor from "@monaco-editor/react";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { BarChart3, BrainCircuit, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
+import { BarChart3, BrainCircuit, CheckCircle2, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -105,15 +105,15 @@ const AUTO_AGENT_BLUEPRINT: Array<{ id: string; title: string; prompt: string; p
   },
   {
     id: "train_model",
-    title: "Train Model",
+    title: "Feature Loop & Train",
     promote: false,
-    prompt: "Train multiple suitable models. Identify classification or regression, include ensemble methods when appropriate, compare train/test scores, and avoid overfit."
+    prompt: "Train multiple suitable models, then let the AI review performance. If score or overfit needs improvement, loop back through stronger feature engineering, retest feature sets, choose the best model again, and retrain."
   },
   {
     id: "tune_evaluate",
-    title: "Tune & Evaluate",
+    title: "Improve, Tune & Evaluate",
     promote: false,
-    prompt: "Tune hyperparameters, evaluate the best model, produce accuracy or regression score, confusion matrix for classification, feature importance, and model comparison."
+    prompt: "Tune hyperparameters and evaluate the best model from the feature loop. If improvement is still needed, retry engineered feature sets, compare tuned vs first models, and produce accuracy or regression score, confusion matrix, feature importance, and model comparison."
   },
   {
     id: "save_predict",
@@ -811,7 +811,7 @@ function buildAutoAgentPrompt(
     `Current dataset version: ${dataset.profile.version_id}; file ${dataset.filename}; rows ${formatNumber(dataset.profile.rows)}; columns ${formatNumber(dataset.profile.columns)}; quality ${dataset.profile.data_quality_score}%.`,
     `Previous sandbox outputs and memory:\n${context}`,
     "Think step by step inside the code. Write auditable outputs, validation_report.json, execution_summary.json, and any requested review artifacts.",
-    ["train_model", "tune_evaluate", "save_predict"].includes(blueprint.id) ? "Do not skip validation. Do not choose an overfit model just because train score is high." : "Do not skip validation. Do not train a model in this stage.",
+    ["train_model", "tune_evaluate", "save_predict"].includes(blueprint.id) ? "Do not skip validation. Train, review whether improvement is needed, loop through stronger engineered features when needed, choose the best model by test performance with an overfit penalty, and retrain/retest before finalizing." : "Do not skip validation. Do not train a model in this stage.",
     blueprint.prompt
   ].join("\n");
 }
@@ -1291,9 +1291,17 @@ function AutoAgentPanel({ steps }: { steps: AutoAgentStep[] }) {
                 {index < steps.length - 1 && <span className="auto-agent-connector" />}
               </div>
               <div className="auto-agent-step-content">
-                <span className={step.status === "running" ? "auto-agent-step-label shimmer-text" : "auto-agent-step-label"}>{step.title}</span>
+                <div className="min-w-0">
+                  <span className={step.status === "running" ? "auto-agent-step-label shimmer-text" : "auto-agent-step-label"}>{step.title}</span>
+                  {["train_model", "tune_evaluate"].includes(step.id) && step.status === "running" && <div className="auto-agent-mini-loop" aria-label="Feature engineering training loop">
+                    <span>features</span>
+                    <span>review</span>
+                    <span>retest</span>
+                    <span>choose model</span>
+                  </div>}
+                </div>
                 <span className="auto-agent-step-state">
-                  {step.status === "running" ? "processing" : step.status === "success" ? step.versionId ? `saved ${step.versionId}` : "done" : step.status === "failed" ? "failed" : ""}
+                  {step.status === "running" ? ["train_model", "tune_evaluate"].includes(step.id) ? "looping" : "processing" : step.status === "success" ? step.versionId ? `saved ${step.versionId}` : "done" : step.status === "failed" ? "failed" : ""}
                 </span>
               </div>
             </div>
@@ -1302,6 +1310,7 @@ function AutoAgentPanel({ steps }: { steps: AutoAgentStep[] }) {
         {model?.status === "success" && <div className="auto-agent-result-strip metric-grid">
           <Metric label={metric?.label ?? "score"} value={metric?.value ?? "-"} />
           <Metric label="Best model" value={model.model ?? "-"} />
+          <Metric label="Feature set" value={model.feature_set ?? "-"} />
           <Metric label="Target" value={model.target ?? "-"} />
           <Metric label="Overfit gap" value={model.overfit_gap == null ? "-" : Number(model.overfit_gap).toFixed(4)} />
         </div>}
@@ -1435,6 +1444,7 @@ function TaskResultCell({
 }) {
   const model = task.execution.validation_report?.model as Record<string, any> | undefined;
   const featureImportance = Array.isArray(model?.feature_importance) ? model.feature_importance as Array<{ feature: string; importance: number }> : [];
+  const featureLoop = Array.isArray(model?.feature_loop) ? model.feature_loop as Array<Record<string, any>> : [];
   const predictionPreview = Array.isArray(model?.predictions_preview) ? model.predictions_preview as Record<string, unknown>[] : [];
   const modelMetric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
   const plotFiles = task.execution.generated_files.filter((file) => file.endsWith(".png"));
@@ -1456,9 +1466,12 @@ function TaskResultCell({
           {model?.status === "success" && <div className="metric-grid">
             <Metric label={modelMetric?.label ?? "score"} value={modelMetric?.value ?? "-"} />
             <Metric label="Target" value={model.target ?? "-"} />
+            <Metric label="Feature set" value={model.feature_set ?? "-"} />
+            <Metric label="Loop" value={model.loop_iteration == null ? "-" : `pass ${model.loop_iteration}`} />
             <Metric label="Train rows" value={formatNumber(Number(model.rows_train ?? 0))} />
             <Metric label="Test rows" value={formatNumber(Number(model.rows_test ?? 0))} />
           </div>}
+          {featureLoop.length > 0 ? <FeatureLoopProgress loops={featureLoop} selectedLoop={Number(model?.loop_iteration ?? 0)} /> : model?.ai_review && <FeatureLoopReview review={model.ai_review as Record<string, any>} />}
           {model?.metrics && <pre className="max-h-40 overflow-auto border border-line bg-base p-2 font-mono text-muted">{JSON.stringify(model.metrics, null, 2)}</pre>}
           <div className="flex flex-wrap gap-2 pt-1">
             {datasetId && <button className="success-button" disabled={task.execution.status !== "success" || approvePending} onClick={onApprove} type="button"><ShieldCheck className="h-3.5 w-3.5" />{approvePending ? "Approving..." : "Approve as version"}</button>}
@@ -1525,6 +1538,66 @@ function PlotPreview({ title, taskId, files }: { title: string; taskId: string; 
       </div>
     </div>
   );
+}
+
+function FeatureLoopProgress({ loops, selectedLoop }: { loops: Array<Record<string, any>>; selectedLoop: number }) {
+  return (
+    <section className="feature-loop-panel" aria-label="AI feature engineering loop progress">
+      <div className="feature-loop-head">
+        <div>
+          <div className="text-xs font-medium text-ink">AI feature loop</div>
+          <div className="text-[11px] text-muted">Engineer features, train, review, then retrain when improvement is needed.</div>
+        </div>
+        <span>{loops.length} pass{loops.length === 1 ? "" : "es"}</span>
+      </div>
+      <div className="feature-loop-steps">
+        {loops.map((loop) => {
+          const review = (loop.review ?? {}) as Record<string, any>;
+          const iteration = Number(loop.iteration ?? 0);
+          const selected = selectedLoop === iteration;
+          const needsImprovement = Boolean(review.needs_improvement);
+          return (
+            <div key={`${loop.feature_set}-${iteration}`} className={selected ? "feature-loop-card feature-loop-card-selected" : "feature-loop-card"}>
+              <div className="feature-loop-card-top">
+                <span className="feature-loop-pass">Pass {iteration || "-"}</span>
+                <span className={needsImprovement ? "feature-loop-badge feature-loop-badge-warn" : "feature-loop-badge feature-loop-badge-ok"}>
+                  {needsImprovement ? <RefreshCw className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                  {needsImprovement ? "needs retry" : "accepted"}
+                </span>
+              </div>
+              <div className="feature-loop-name">{String(loop.feature_set ?? "feature_set").split("_").join(" ")}</div>
+              <div className="feature-loop-metrics">
+                <span>model <strong>{String(loop.best_model ?? "-").split("_").join(" ")}</strong></span>
+                <span>score <strong>{formatMaybeNumber(review.score)}</strong></span>
+                <span>gap <strong>{formatMaybeNumber(review.overfit_gap)}</strong></span>
+              </div>
+              {Array.isArray(loop.actions) && loop.actions.length > 0 && <div className="feature-loop-actions">
+                {loop.actions.map((action: unknown) => <span key={String(action)}>{String(action)}</span>)}
+              </div>}
+              {review.reason && <p>{String(review.reason)}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FeatureLoopReview({ review }: { review: Record<string, any> }) {
+  return (
+    <section className="feature-loop-panel">
+      <div className="feature-loop-head">
+        <div className="text-xs font-medium text-ink">AI model review</div>
+        <span>{review.needs_improvement ? "needs improvement" : "accepted"}</span>
+      </div>
+      <p className="text-xs text-muted">{String(review.reason ?? "Model review completed.")}</p>
+    </section>
+  );
+}
+
+function formatMaybeNumber(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric.toFixed(4) : "-";
 }
 
 function PlotImage({ taskId, file }: { taskId: string; file: string }) {

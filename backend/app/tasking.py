@@ -314,23 +314,7 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, mean_absolute_error, r2_score
                 from sklearn.model_selection import GridSearchCV, train_test_split
 
-                stratify = y if y.nunique(dropna=True) > 1 and y.nunique(dropna=True) <= 20 else None
-                try:
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=stratify)
-                except Exception:
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
                 is_classification = y.dtype == object or str(y.dtype).startswith("string") or y.nunique(dropna=True) <= 20
-                split_summary = {{
-                    "target": str(target),
-                    "task_type": "classification" if is_classification else "regression",
-                    "rows_total": int(len(X)),
-                    "rows_train": int(len(X_train)),
-                    "rows_test": int(len(X_test)),
-                    "feature_count": int(X.shape[1]),
-                    "stratified": bool(stratify is not None),
-                }}
-                (OUTPUT_DIR / "split_summary.json").write_text(json.dumps(split_summary, indent=2, default=json_default))
-                record("split_data", split_summary)
                 if is_classification:
                     candidates = [
                         ("logistic_regression", LogisticRegression(max_iter=500)),
@@ -353,53 +337,129 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                         "gradient_boosting": {{"n_estimators": [80, 140], "learning_rate": [0.05, 0.1], "max_depth": [2, 3]}},
                     }}
 
-                comparisons = []
-                best = None
-                for name, base_model in candidates:
-                    estimator = base_model
-                    best_params = {{}}
-                    if TASK.get("wants_auto_ml") and name in grids and len(X_train) >= 8:
-                        cv_splits = min(3, len(X_train))
-                        if is_classification:
-                            class_counts = pd.Series(y_train).value_counts()
-                            if len(class_counts):
-                                cv_splits = min(cv_splits, int(class_counts.min()))
-                        if cv_splits >= 2:
-                            scoring = "accuracy" if is_classification else "r2"
-                            search = GridSearchCV(base_model, grids[name], cv=cv_splits, scoring=scoring, n_jobs=-1)
-                            search.fit(X_train, y_train)
-                            estimator = search.best_estimator_
-                            best_params = search.best_params_
-                    estimator.fit(X_train, y_train)
-                    train_pred = estimator.predict(X_train)
-                    test_pred = estimator.predict(X_test)
+                def make_feature_variants(base_X):
+                    clean_base = base_X.replace([np.inf, -np.inf], np.nan).fillna(0).copy()
+                    variants = [("baseline_features", clean_base, ["use the prepared feature table"])]
+                    if clean_base.shape[1] >= 3:
+                        variances = clean_base.var(numeric_only=True).sort_values(ascending=False)
+                        keep = [column for column in variances.index if float(variances[column]) > 1e-10]
+                        selected = clean_base[keep[: min(len(keep), 80)]].copy() if keep else clean_base.copy()
+                        if 0 < selected.shape[1] < clean_base.shape[1]:
+                            corr = selected.corr(numeric_only=True).abs()
+                            upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+                            drop = [column for column in upper.columns if any(upper[column] > 0.98)]
+                            selected = selected.drop(columns=drop, errors="ignore")
+                            if selected.shape[1] > 0:
+                                variants.append(("selected_low_leakage_features", selected, ["drop near-constant features", "drop highly correlated duplicates"]))
+                    if clean_base.shape[1] >= 2 and clean_base.shape[1] <= 80:
+                        variances = clean_base.var(numeric_only=True).sort_values(ascending=False)
+                        top_columns = [column for column in variances.index[: min(4, len(variances.index))]]
+                        enriched = clean_base.copy()
+                        for left_index, left in enumerate(top_columns):
+                            for right in top_columns[left_index + 1:]:
+                                enriched[f"{{left}}__x__{{right}}"] = clean_base[left] * clean_base[right]
+                        for column in top_columns:
+                            enriched[f"{{column}}__squared"] = clean_base[column] ** 2
+                        if enriched.shape[1] > clean_base.shape[1]:
+                            variants.append(("interaction_features", enriched.replace([np.inf, -np.inf], np.nan).fillna(0), ["add pairwise interactions", "add squared high-variance terms"]))
+                    return variants[:3]
+
+                def review_result(comparison):
+                    score = float(comparison.get("test_score", 0.0))
+                    gap = float(comparison.get("overfit_gap", 0.0))
                     if is_classification:
-                        train_score = float(accuracy_score(y_train, train_pred))
-                        test_score = float(accuracy_score(y_test, test_pred))
-                        metrics = {{"accuracy": test_score, "f1": float(f1_score(y_test, test_pred, average="weighted", zero_division=0))}}
+                        good_enough = score >= 0.92 and gap <= 0.12
+                        reason = "classification score is strong and overfit gap is controlled" if good_enough else "classification score or overfit gap needs improvement"
                     else:
-                        train_score = float(r2_score(y_train, train_pred))
-                        test_score = float(r2_score(y_test, test_pred))
-                        metrics = {{"r2": test_score, "mae": float(mean_absolute_error(y_test, test_pred))}}
-                    overfit_gap = float(train_score - test_score)
-                    penalized_score = test_score - max(0.0, overfit_gap - 0.12)
-                    comparison = {{
-                        "name": name,
-                        "train_score": train_score,
-                        "test_score": test_score,
-                        "overfit_gap": overfit_gap,
-                        "penalized_score": penalized_score,
-                        "metrics": metrics,
-                        "best_params": best_params,
+                        good_enough = score >= 0.85 and gap <= 0.15
+                        reason = "regression score is strong and overfit gap is controlled" if good_enough else "regression score or overfit gap needs improvement"
+                    return {{"needs_improvement": not good_enough, "reason": reason, "score": score, "overfit_gap": gap}}
+
+                feature_variants = make_feature_variants(X)
+                comparisons = []
+                loop_reviews = []
+                best = None
+                for loop_index, (feature_set_name, candidate_X, feature_actions) in enumerate(feature_variants, start=1):
+                    stratify = y if is_classification and y.nunique(dropna=True) > 1 and y.nunique(dropna=True) <= 20 else None
+                    try:
+                        X_train, X_test, y_train, y_test = train_test_split(candidate_X, y, test_size=0.2, random_state=42, stratify=stratify)
+                    except Exception:
+                        X_train, X_test, y_train, y_test = train_test_split(candidate_X, y, test_size=0.2, random_state=42)
+                    split_summary = {{
+                        "target": str(target),
+                        "task_type": "classification" if is_classification else "regression",
+                        "rows_total": int(len(candidate_X)),
+                        "rows_train": int(len(X_train)),
+                        "rows_test": int(len(X_test)),
+                        "feature_count": int(candidate_X.shape[1]),
+                        "feature_set": feature_set_name,
+                        "loop_iteration": loop_index,
+                        "stratified": bool(stratify is not None),
                     }}
-                    comparisons.append(comparison)
-                    if best is None or comparison["penalized_score"] > best["comparison"]["penalized_score"]:
-                        best = {{"name": name, "model": estimator, "comparison": comparison, "pred": test_pred}}
+                    if loop_index == 1:
+                        (OUTPUT_DIR / "split_summary.json").write_text(json.dumps(split_summary, indent=2, default=json_default))
+                    record("feature_model_loop", {{"iteration": loop_index, "feature_set": feature_set_name, "actions": feature_actions, "feature_count": int(candidate_X.shape[1])}})
+                    loop_best = None
+                    for name, base_model in candidates:
+                        estimator = base_model
+                        best_params = {{}}
+                        if TASK.get("wants_auto_ml") and name in grids and len(X_train) >= 8:
+                            cv_splits = min(3, len(X_train))
+                            if is_classification:
+                                class_counts = pd.Series(y_train).value_counts()
+                                if len(class_counts):
+                                    cv_splits = min(cv_splits, int(class_counts.min()))
+                            if cv_splits >= 2:
+                                scoring = "accuracy" if is_classification else "r2"
+                                search = GridSearchCV(base_model, grids[name], cv=cv_splits, scoring=scoring, n_jobs=-1)
+                                search.fit(X_train, y_train)
+                                estimator = search.best_estimator_
+                                best_params = search.best_params_
+                        estimator.fit(X_train, y_train)
+                        train_pred = estimator.predict(X_train)
+                        test_pred = estimator.predict(X_test)
+                        if is_classification:
+                            train_score = float(accuracy_score(y_train, train_pred))
+                            test_score = float(accuracy_score(y_test, test_pred))
+                            metrics = {{"accuracy": test_score, "f1": float(f1_score(y_test, test_pred, average="weighted", zero_division=0))}}
+                        else:
+                            train_score = float(r2_score(y_train, train_pred))
+                            test_score = float(r2_score(y_test, test_pred))
+                            metrics = {{"r2": test_score, "mae": float(mean_absolute_error(y_test, test_pred))}}
+                        overfit_gap = float(train_score - test_score)
+                        penalized_score = test_score - max(0.0, overfit_gap - 0.12)
+                        comparison = {{
+                            "name": name,
+                            "feature_set": feature_set_name,
+                            "loop_iteration": loop_index,
+                            "feature_count": int(candidate_X.shape[1]),
+                            "train_score": train_score,
+                            "test_score": test_score,
+                            "overfit_gap": overfit_gap,
+                            "penalized_score": penalized_score,
+                            "metrics": metrics,
+                            "best_params": best_params,
+                        }}
+                        comparisons.append(comparison)
+                        if loop_best is None or comparison["penalized_score"] > loop_best["comparison"]["penalized_score"]:
+                            loop_best = {{"name": name, "model": estimator, "comparison": comparison, "pred": test_pred, "X": candidate_X, "X_train": X_train, "X_test": X_test, "y_test": y_test, "feature_actions": feature_actions}}
+                    if loop_best is not None:
+                        review = review_result(loop_best["comparison"])
+                        loop_reviews.append({{"iteration": loop_index, "feature_set": feature_set_name, "best_model": loop_best["name"], "review": review, "actions": feature_actions}})
+                        record("ai_model_review", loop_reviews[-1])
+                        if best is None or loop_best["comparison"]["penalized_score"] > best["comparison"]["penalized_score"]:
+                            best = loop_best
+                        if not review["needs_improvement"]:
+                            break
 
                 if best is None:
                     raise ValueError("No model candidates could be trained.")
                 model = best["model"]
                 pred = best["pred"]
+                X = best["X"]
+                X_train = best["X_train"]
+                X_test = best["X_test"]
+                y_test = best["y_test"]
                 metrics = best["comparison"]["metrics"]
                 predictions_rows = pd.DataFrame({{"actual": y_test.reset_index(drop=True), "prediction": pred}}).head(100).to_dict(orient="records")
                 confusion_payload = {{"status": "not_classification"}}
@@ -427,10 +487,14 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                     "target": str(target),
                     "task_type": "classification" if is_classification else "regression",
                     "model": best["name"],
+                    "feature_set": best["comparison"].get("feature_set"),
+                    "loop_iteration": best["comparison"].get("loop_iteration"),
                     "rows_train": int(len(X_train)),
                     "rows_test": int(len(X_test)),
                     "metrics": metrics,
                     "overfit_gap": best["comparison"]["overfit_gap"],
+                    "ai_review": loop_reviews[-1]["review"] if loop_reviews else {{"needs_improvement": False, "reason": "single-pass model review completed"}},
+                    "feature_loop": loop_reviews,
                     "model_comparison": comparisons,
                     "confusion_matrix": confusion_payload,
                     "feature_importance": [{{"feature": name, "importance": float(score)}} for name, score in importances],
@@ -645,10 +709,14 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                 "status": model_result.get("status"),
                 "target": model_result.get("target"),
                 "model": model_result.get("model"),
+                "feature_set": model_result.get("feature_set"),
+                "loop_iteration": model_result.get("loop_iteration"),
                 "rows_train": model_result.get("rows_train"),
                 "rows_test": model_result.get("rows_test"),
                 "metrics": model_result.get("metrics", {{}}),
                 "overfit_gap": model_result.get("overfit_gap"),
+                "ai_review": model_result.get("ai_review", {{}}),
+                "feature_loop": model_result.get("feature_loop", []),
                 "model_comparison": model_result.get("model_comparison", []),
                 "confusion_matrix": model_result.get("confusion_matrix", {{}}),
                 "pca": pca_result,

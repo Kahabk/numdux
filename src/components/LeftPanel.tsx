@@ -3,6 +3,8 @@ import type React from "react";
 import type { DatasetRecord, DatasetVersion } from "../lib/types";
 import { cn } from "../lib/utils";
 
+const logoSrc = new URL("../../numdux_logo.png", import.meta.url).href;
+
 export function LeftPanel({
   datasets,
   filename,
@@ -36,7 +38,9 @@ export function LeftPanel({
 }) {
   return (
     <aside className="flex h-full min-w-0 flex-col border-r border-line bg-base text-xs">
-      <div className="flex h-10 shrink-0 items-center border-b border-line px-3 font-medium text-ink">Numdux</div>
+      <div className="flex h-11 shrink-0 items-center border-b border-line px-3">
+        <img className="h-25 max-w-[180px] object-contain" src={logoSrc} alt="Numdux" />
+      </div>
       <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden p-2">
         <button
           className="flex h-7 w-full items-center gap-2 rounded-sm border border-line px-2 text-left text-muted hover:border-accent hover:text-ink disabled:opacity-50"
