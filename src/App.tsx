@@ -400,72 +400,72 @@ export function App() {
       />
     ) : (
       <Notebook
-      dataset={dataset}
-      run={run}
-      code={code}
-      instruction={instruction}
-      upload={upload}
-      clean={clean}
-      executeCode={executeCode}
-      approve={approve}
-      healthStatus={health.isSuccess ? "connected" : health.isLoading || health.isFetching ? "checking" : "offline"}
-      providerStatus={provider.data}
-      isRefreshing={savedDatasets.isFetching}
-      report={report.data}
-      reportLoading={report.isFetching}
-      analysisPlan={analysisPlan}
-      planPending={planOnly.isPending}
-      agentPrompt={agentPrompt}
-      agentPending={sandboxTask.isPending}
-      sandboxes={sandboxes}
-      taskResults={taskResults}
-      taskPendingSandboxId={sandboxTask.isPending ? sandboxTask.variables?.sandboxId : undefined}
-      taskError={sandboxTask.error?.message}
-      approveTaskPendingId={approveTask.isPending ? approveTask.variables?.taskId : undefined}
-      approveTaskError={approveTask.error?.message}
-      activeSandboxId={activeSandboxId}
-      manualCells={manualCells}
-      selectedCellId={selectedCellId}
-      executionStage={executionStage}
-      reportPreview={reportPreview}
-      appTheme={appTheme}
-      reportTheme={reportTheme}
-      uploadInputRef={uploadInputRef}
-      onRefresh={() => savedDatasets.refetch()}
-      onInstructionChange={setInstruction}
-      onRunInstruction={runWithInstruction}
-      onCreatePlan={createPlan}
-      onVersionChange={(versionId) => getDatasetVersion(dataset!.dataset_id, versionId).then(setDataset)}
-      onShowReport={() => setReportPreview(true)}
-      onHideReport={() => setReportPreview(false)}
-      onRefreshReport={() => report.refetch()}
-      onAgentPromptChange={setAgentPrompt}
-      onToggleAppTheme={() => setAppTheme((theme) => theme === "dark" ? "light" : "dark")}
-      onToggleReportTheme={() => setReportTheme((theme) => theme === "light" ? "dark" : "light")}
-      onCodeChange={setCode}
-      onRunCode={runEditedCode}
-      onApprove={() => approve.mutate()}
-      onReject={() => setRun(null)}
-      onSandboxChange={setActiveSandboxId}
-      onCreateSandbox={createSandbox}
-      onAddManualCell={addManualCell}
-      onSelectManualCell={setSelectedCellId}
-      onUpdateManualCell={updateManualCell}
-      onRemoveManualCell={(id) => { setManualCells((cells) => cells.filter((cell) => cell.id !== id)); setSelectedCellId((current) => current === id ? null : current); }}
-      onRunManualCell={(cell) => { if (!dataset) return; if (cell.type === "python") manualPython.mutate({ id: cell.id, source: cell.source }); else if (cell.type === "sql") manualSql.mutate({ id: cell.id, source: cell.source }); }}
-      onRunSandboxTask={(sandboxId, prompt) => {
-        sandboxTask.mutate({ sandboxId, prompt });
-        setAgentPrompt("");
-      }}
-      onRunNewSandboxTask={runNewSandboxTask}
-      workflowMemory={workflowMemory}
-      autoAgentSteps={autoAgentSteps}
-      autoAgentStatus={autoAgentStatus}
-      onRunAutoAgent={runAutoAgentPipeline}
-      onApproveSandboxTask={(taskId) => approveTask.mutate({ taskId })}
-      onStop={() => setExecutionStage("Cancelled")}
-      onRestartSandbox={restartSandbox}
-    />
+        dataset={dataset}
+        run={run}
+        code={code}
+        instruction={instruction}
+        upload={upload}
+        clean={clean}
+        executeCode={executeCode}
+        approve={approve}
+        healthStatus={health.isSuccess ? "connected" : health.isLoading || health.isFetching ? "checking" : "offline"}
+        providerStatus={provider.data}
+        isRefreshing={savedDatasets.isFetching}
+        report={report.data}
+        reportLoading={report.isFetching}
+        analysisPlan={analysisPlan}
+        planPending={planOnly.isPending}
+        agentPrompt={agentPrompt}
+        agentPending={sandboxTask.isPending}
+        sandboxes={sandboxes}
+        taskResults={taskResults}
+        taskPendingSandboxId={sandboxTask.isPending ? sandboxTask.variables?.sandboxId : undefined}
+        taskError={sandboxTask.error?.message}
+        approveTaskPendingId={approveTask.isPending ? approveTask.variables?.taskId : undefined}
+        approveTaskError={approveTask.error?.message}
+        activeSandboxId={activeSandboxId}
+        manualCells={manualCells}
+        selectedCellId={selectedCellId}
+        executionStage={executionStage}
+        reportPreview={reportPreview}
+        appTheme={appTheme}
+        reportTheme={reportTheme}
+        uploadInputRef={uploadInputRef}
+        onRefresh={() => savedDatasets.refetch()}
+        onInstructionChange={setInstruction}
+        onRunInstruction={runWithInstruction}
+        onCreatePlan={createPlan}
+        onVersionChange={(versionId) => getDatasetVersion(dataset!.dataset_id, versionId).then(setDataset)}
+        onShowReport={() => setReportPreview(true)}
+        onHideReport={() => setReportPreview(false)}
+        onRefreshReport={() => report.refetch()}
+        onAgentPromptChange={setAgentPrompt}
+        onToggleAppTheme={() => setAppTheme((theme) => theme === "dark" ? "light" : "dark")}
+        onToggleReportTheme={() => setReportTheme((theme) => theme === "light" ? "dark" : "light")}
+        onCodeChange={setCode}
+        onRunCode={runEditedCode}
+        onApprove={() => approve.mutate()}
+        onReject={() => setRun(null)}
+        onSandboxChange={setActiveSandboxId}
+        onCreateSandbox={createSandbox}
+        onAddManualCell={addManualCell}
+        onSelectManualCell={setSelectedCellId}
+        onUpdateManualCell={updateManualCell}
+        onRemoveManualCell={(id) => { setManualCells((cells) => cells.filter((cell) => cell.id !== id)); setSelectedCellId((current) => current === id ? null : current); }}
+        onRunManualCell={(cell) => { if (!dataset) return; if (cell.type === "python") manualPython.mutate({ id: cell.id, source: cell.source }); else if (cell.type === "sql") manualSql.mutate({ id: cell.id, source: cell.source }); }}
+        onRunSandboxTask={(sandboxId, prompt) => {
+          sandboxTask.mutate({ sandboxId, prompt });
+          setAgentPrompt("");
+        }}
+        onRunNewSandboxTask={runNewSandboxTask}
+        workflowMemory={workflowMemory}
+        autoAgentSteps={autoAgentSteps}
+        autoAgentStatus={autoAgentStatus}
+        onRunAutoAgent={runAutoAgentPipeline}
+        onApproveSandboxTask={(taskId) => approveTask.mutate({ taskId })}
+        onStop={() => setExecutionStage("Cancelled")}
+        onRestartSandbox={restartSandbox}
+      />
     )
   );
   const left = (
@@ -1270,57 +1270,104 @@ function CommandWorkspace({
 }
 
 function AutoAgentPanel({ steps }: { steps: AutoAgentStep[] }) {
+  const [currentLoopIndex, setCurrentLoopIndex] = useState<number>(0);
+
+  const runningIndex = steps.findIndex((s) => s.status === "running");
+  const lastSuccessIndex = [...steps].map((s, i) => ({ s, i })).filter((x) => x.s.status === "success").pop()?.i ?? -1;
+  const activeLevel = runningIndex >= 0 ? runningIndex : lastSuccessIndex >= 0 ? lastSuccessIndex : 0;
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentLoopIndex((prev) => (prev + 1) % 4);
+    }, 750);
+    return () => clearInterval(timer);
+  }, []);
+
   const latestSuccess = [...steps].reverse().find((step) => step.status === "success" && step.task);
   const model = latestSuccess?.task?.execution.validation_report?.model as Record<string, any> | undefined;
   const metric = model?.metrics ? taskModelMetric(model.metrics as Record<string, number | null>) : null;
+
   return (
-    <section className="auto-agent-panel border-b border-line bg-notebook px-4 py-5" aria-live="polite">
-      <div className="auto-agent-flow-shell w-full">
+    <section className="auto-agent-panel border-b border-line bg-notebook px-4 py-4" aria-live="polite">
+      <div className="auto-agent-flow-shell max-w-xl">
         <div className="auto-agent-vertical" role="list" aria-label="AI workflow progress">
-          {steps.map((step, index) => (
-            <div
-              key={step.id}
-              className={`auto-agent-flow-step auto-agent-flow-step-${step.status}`}
-              role="listitem"
-              aria-current={step.status === "running" ? "step" : undefined}
-            >
-              <div className="auto-agent-step-rail" aria-hidden="true">
-                <div className="auto-agent-step-icon">
-                  <AutoAgentIcon stepId={step.id} />
+          {steps.map((step, index) => {
+            const isRunning = step.status === "running";
+            const isSuccess = step.status === "success";
+            const isFailed = step.status === "failed";
+            const isLoopStep = step.id === "train_model" || step.id === "tune_evaluate";
+            const isVisible = isSuccess || isRunning || isFailed;
+
+            /* Hide steps that haven't been reached yet */
+            if (!isVisible) return null;
+
+            return (
+              <div
+                key={step.id}
+                className={`auto-agent-flow-step auto-agent-step-revealed ${isRunning ? "auto-agent-flow-step-running" : isSuccess ? "auto-agent-flow-step-success" : ""}`}
+                role="listitem"
+              >
+                <div className="auto-agent-step-rail" aria-hidden="true">
+                  <div className={`auto-agent-step-icon ${isRunning ? "auto-agent-icon-active-glow" : isSuccess ? "auto-agent-icon-success-glow" : ""}`}>
+                    <AutoAgentIcon stepId={step.id} isRunning={isRunning} />
+                  </div>
+                  {index < activeLevel && <span className="auto-agent-connector auto-agent-connector-active" />}
+                  {index === activeLevel && index < steps.length - 1 && <span className="auto-agent-connector" />}
                 </div>
-                {index < steps.length - 1 && <span className="auto-agent-connector" />}
-              </div>
-              <div className="auto-agent-step-content">
-                <div className="min-w-0">
-                  <span className={step.status === "running" ? "auto-agent-step-label shimmer-text" : "auto-agent-step-label"}>{step.title}</span>
-                  {["train_model", "tune_evaluate"].includes(step.id) && step.status === "running" && <div className="auto-agent-mini-loop" aria-label="Feature engineering training loop">
-                    <span>features</span>
-                    <span>review</span>
-                    <span>retest</span>
-                    <span>choose model</span>
-                  </div>}
+
+                <div className="auto-agent-step-content">
+                  <div className="min-w-0">
+                    <span className={`auto-agent-step-label ${isRunning ? "ai-step-title-running" : "ai-step-title-shine"}`}>
+                      {step.title}
+                    </span>
+
+                    {isLoopStep && isRunning && (
+                      <div className="auto-agent-mini-loop mt-1 flex flex-wrap gap-1.5" aria-label="Feature engineering training loop">
+                        {["features", "review", "retest", "choose model"].map((chip, cIdx) => (
+                          <span
+                            key={chip}
+                            className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border transition-all ${
+                              currentLoopIndex === cIdx
+                                ? "border-accent bg-accent/20 text-white shadow-[0_0_8px_rgba(99,102,241,0.5)] scale-105"
+                                : "border-line bg-panel text-muted/60"
+                            }`}
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className={`auto-agent-step-state ${isRunning ? "ai-state-shine" : ""}`}>
+                    {isRunning
+                      ? isLoopStep ? "looping..." : "processing..."
+                      : isSuccess
+                      ? step.versionId ? `saved ${step.versionId}` : "done"
+                      : isFailed ? "failed" : ""}
+                  </span>
                 </div>
-                <span className="auto-agent-step-state">
-                  {step.status === "running" ? ["train_model", "tune_evaluate"].includes(step.id) ? "looping" : "processing" : step.status === "success" ? step.versionId ? `saved ${step.versionId}` : "done" : step.status === "failed" ? "failed" : ""}
-                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-        {model?.status === "success" && <div className="auto-agent-result-strip metric-grid">
-          <Metric label={metric?.label ?? "score"} value={metric?.value ?? "-"} />
-          <Metric label="Best model" value={model.model ?? "-"} />
-          <Metric label="Feature set" value={model.feature_set ?? "-"} />
-          <Metric label="Target" value={model.target ?? "-"} />
-          <Metric label="Overfit gap" value={model.overfit_gap == null ? "-" : Number(model.overfit_gap).toFixed(4)} />
-        </div>}
+
+        {model?.status === "success" && (
+          <div className="auto-agent-result-strip metric-grid mt-4">
+            <Metric label={metric?.label ?? "score"} value={metric?.value ?? "-"} />
+            <Metric label="Best model" value={model.model ?? "-"} />
+            <Metric label="Feature set" value={model.feature_set ?? "-"} />
+            <Metric label="Target" value={model.target ?? "-"} />
+            <Metric label="Overfit gap" value={model.overfit_gap == null ? "-" : Number(model.overfit_gap).toFixed(4)} />
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function AutoAgentIcon({ stepId }: { stepId: string }) {
-  const className = "h-[18px] w-[18px]";
+function AutoAgentIcon({ stepId, isRunning }: { stepId: string; isRunning?: boolean }) {
+  const className = `h-[18px] w-[18px] transition-transform duration-300 ${isRunning ? "scale-110 text-white" : ""}`;
   if (stepId === "load_data") return <Database className={className} />;
   if (stepId === "explore_data") return <Search className={className} />;
   if (stepId === "visualize_data") return <BarChart3 className={className} />;
