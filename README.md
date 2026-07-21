@@ -21,8 +21,9 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 
 ## Demo
 
-<!-- TODO: Drop recorded demo GIF (e.g. docs/demo.gif) here before public release -->
-<!-- <p align="center"><img src="docs/demo.gif" alt="Numdux Notebook Demo" width="100%" /></p> -->
+<p align="center">
+  <img src="output.gif" alt="Numdux Notebook Demo" width="100%" />
+</p>
 
 ## What You Can Do
 
