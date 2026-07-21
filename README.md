@@ -7,6 +7,7 @@
 <p>
   <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-2f6fed" />
   <img alt="Status" src="https://img.shields.io/badge/status-local--first-18a058" />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
   <img alt="Frontend" src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-646cff" />
   <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688" />
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776ab" />
@@ -18,20 +19,30 @@ Numdux is a local-first data-quality notebook for profiling datasets, planning c
 
 The app combines a React/Vite frontend with a FastAPI backend. Dataset processing happens through scoped backend execution paths and sandbox task runs, with deterministic local planning available by default and optional Gemini support for richer AI-assisted planning.
 
+## Demo
+
+<!-- TODO: Drop recorded demo GIF (e.g. docs/demo.gif) here before public release -->
+<!-- <p align="center"><img src="docs/demo.gif" alt="Numdux Notebook Demo" width="100%" /></p> -->
+
 ## What You Can Do
 
-- Upload CSV, TSV, Excel, Parquet, JSON, and JSONL files.
-- Profile datasets on ingest, including schema, nulls, duplicates, distributions, outliers, correlations, covariance, sample rows, and data-quality score.
-- Run a staged AI workflow for loading, exploration, visualization, cleaning, feature engineering, data preparation, train/test splitting, model training, evaluation, and prediction export.
-- Use manual notebook cells for Python, SQL, and notes.
-- Generate cleaning plans with the built-in rule provider or Gemini.
-- Execute generated or edited Python cleaning code.
-- Query dataset versions with read-only SQL.
-- Build charts and visual quality reports.
-- Train classification or regression models from the Model Lab.
-- Approve successful cleaning and sandbox runs as immutable dataset versions.
-- Export datasets, generated files, reports, and PDF quality summaries.
-- Keep uploaded data, generated versions, task outputs, and reports in local storage.
+### What You Can Do Today
+
+- **Multi-Format Dataset Ingestion**: Upload and profile CSV, TSV, Excel (`.xlsx`, `.xls`), Parquet, JSON, and JSONL files.
+- **Automated Data Quality Profiling**: Compute schema types, missingness percentages, duplicate counts, numerical/categorical distributions, correlation matrices, IQR outliers, sample preview rows, and an overall 0–100 data quality score.
+- **Staged AI Workflow Execution**: Run a 10-step guided pipeline (*Load*, *Explore*, *Visualize*, *Clean*, *Feature Engineering*, *Prepare*, *Split*, *Train*, *Tune & Evaluate*, *Save & Predict*) with step-by-step progress tracking.
+- **Interactive Hybrid Notebook Cells**: Execute Python code cells in isolated sandboxes and run read-only DuckDB SQL queries over dataset versions alongside markdown notes.
+- **Deterministic & LLM Cleaning Plans**: Generate data cleaning proposals using the built-in rule provider or Google Gemini (`gemini-3.5-flash`).
+- **Immutable Dataset Versioning**: Inspect transformation diffs, preview outputs, and promote approved sandbox runs into version snapshots stored in local storage (`.numdux_data/`).
+- **Model Lab**: Train scikit-learn classification and regression models, evaluate performance metrics (R², RMSE, Accuracy, F1), view feature importances, and calculate overfit gaps.
+- **Exporting & Reporting**: Export dataset versions (CSV, Parquet, JSON) and generate downloadable PDF visual data quality reports.
+
+### Roadmap
+
+- **Multi-Table Relational Joins**: Cross-table merging and relational join operations (currently operating on a single primary dataset at a time).
+- **Remote Data Source Connectors**: Direct integration with S3, GCS, and remote SQL databases (currently strictly local storage under `.numdux_data/`).
+- **Advanced Container Sandboxing**: Configurable container memory/CPU resource caps and egress network firewall rules for the Docker sandbox engine.
+- **Multi-User Collaboration**: Shared workspace state and real-time collaborative notebook sessions (currently optimized for local-first single-user workflows).
 
 ## Stack
 
@@ -138,6 +149,24 @@ The staged AI workflow is defined in the frontend and executed step by step thro
 - Save & Predict
 
 Sandbox task code is generated from the user instruction and dataset profile. The backend validates the generated code before execution, captures generated files, and can attempt repairs for failed code up to the configured attempt limit.
+
+## Security
+
+Numdux Notebook executes generated Python transformation code and manual code cells in a sandbox environment. The system supports two execution engines depending on host capabilities:
+
+### Docker Sandbox Isolation (Recommended)
+When Docker is available on the host machine, task execution runs inside isolated container instances:
+- **Filesystem Isolation**: Code execution is restricted to mounted ephemeral volume paths (`/input` and `/output`), preventing unauthorized host read/write access.
+- **Process Isolation**: Code runs within isolated container namespaces, preventing host process inspection or signaling.
+- **Network & Egress Control**: Outbound network traffic can be disabled or firewalled via container runtime policies.
+
+### Subprocess Sandbox Fallback (Development Only)
+When Docker is absent, Numdux falls back to executing Python scripts via direct host `subprocess.run` inside temporary runtime directories (`.numdux_data/runs/`):
+- **Host Filesystem Exposure**: Python scripts inherit the OS user permissions of the running FastAPI backend process and can read/write accessible host paths.
+- **Network Egress**: Outbound socket connections and HTTP requests are not blocked by operating system sandbox policies.
+- **Unconstrained Resources**: Hard execution timeouts (default: 120s) are enforced, but RAM, CPU utilization, and disk storage are unconstrained.
+
+> **Security Warning**: Use Docker sandbox isolation whenever Numdux is deployed in shared environments, exposed to non-loopback network interfaces, or handling untrusted user datasets and prompt instructions.
 
 ## Local Data Layout
 
