@@ -63,7 +63,7 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 
 Install frontend dependencies:
 
-```bash
+```
 npm install
 ```
 
