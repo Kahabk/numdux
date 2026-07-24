@@ -9,6 +9,7 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from .ai import GeminiAIProvider, RuleBasedAIProvider, SYSTEM_PROMPT
 from .config import get_settings, update_env_file
@@ -662,3 +663,10 @@ def create_ai_provider():
     if settings.ai_provider == "gemini" and settings.gemini_api_key:
         return GeminiAIProvider(api_key=settings.gemini_api_key, model=settings.gemini_model)
     return RuleBasedAIProvider()
+
+
+# Serve static files for frontend in production
+FRONTEND_DIR = Path(__file__).resolve().parent / "dist"
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+

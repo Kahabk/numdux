@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
-from backend.app.cli import main
+import os
+import sys
+from pathlib import Path
 
+# Automatically detect and use local virtual environment if available
+script_dir = Path(__file__).resolve().parent
+venv_python = script_dir / ".venv" / "bin" / "python3"
+if not venv_python.exists():
+    venv_python = script_dir / ".venv" / "Scripts" / "python.exe"
+
+current_python = Path(sys.executable).resolve()
+if venv_python.exists() and current_python != venv_python.resolve():
+    os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
+from backend.app.cli import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

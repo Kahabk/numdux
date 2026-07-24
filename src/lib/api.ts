@@ -9,7 +9,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   if (response.ok) return response.json();
   const text = await response.text();
   if (response.status === 500 && text.trim() === "Internal Server Error") {
-    throw new Error("Backend is not reachable. Start Numdux with ./numdux run, or restart the backend after code changes.");
+    throw new Error("Backend is not reachable. Start Numdux with './numdux', or restart the backend after code changes.");
   }
   try {
     const data = JSON.parse(text);

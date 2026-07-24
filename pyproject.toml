@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "numdux"
+version = "0.2.0"
+description = "A local-first data-quality notebook for profiling datasets, running transformations, and training models."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=14.0.0",
+    "openpyxl>=3.1.0",
+    "scipy>=1.12.0",
+    "scikit-learn>=1.4.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "duckdb>=0.10.0",
+    "polars>=0.20.0",
+    "sqlalchemy>=2.0.0",
+    "redis>=5.0.0",
+    "celery>=5.3.0",
+    "docker>=7.0.0"
+]
+
+[project.scripts]
+numdux = "backend.app.cli:main"
+
+[tool.setuptools]
+packages = ["backend", "backend.app"]
+
+[tool.setuptools.package-data]
+"backend.app" = ["dist/**/*", "dist/*"]

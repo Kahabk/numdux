@@ -1,3 +1,31 @@
+Metadata-Version: 2.4
+Name: numdux
+Version: 0.2.0
+Summary: A local-first data-quality notebook for profiling datasets, running transformations, and training models.
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: fastapi>=0.111.0
+Requires-Dist: uvicorn[standard]>=0.29.0
+Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: pydantic>=2.7.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pyarrow>=14.0.0
+Requires-Dist: openpyxl>=3.1.0
+Requires-Dist: scipy>=1.12.0
+Requires-Dist: scikit-learn>=1.4.0
+Requires-Dist: matplotlib>=3.8.0
+Requires-Dist: seaborn>=0.13.0
+Requires-Dist: duckdb>=0.10.0
+Requires-Dist: polars>=0.20.0
+Requires-Dist: sqlalchemy>=2.0.0
+Requires-Dist: redis>=5.0.0
+Requires-Dist: celery>=5.3.0
+Requires-Dist: docker>=7.0.0
+Dynamic: license-file
+
 <p align="center">
   <img src="NUMDUX.jpg" alt="Numdux banner" width="100%" />
 </p>
@@ -87,23 +115,18 @@ Once installed, start the application from the root folder:
 
 #### On Linux / macOS:
 ```bash
-./numdux
+./numdux run
 ```
 
 #### On Windows:
 ```cmd
-numdux
+numdux run
 ```
 
 *Note: The `numdux` wrapper script will automatically locate and run inside your local virtual environment without needing to activate it manually!*
 
-#### Global Command
-On Windows, the installer automatically registers Numdux in your user environment PATH. After running the installer, you can open a new command prompt or PowerShell window and launch it from **any folder** simply by running:
-```cmd
-numdux
-```
-
-On Linux / macOS, if you want to run `numdux` from any directory, you can add the repository directory to your `PATH` or install it globally using `pipx` or standard `pip`:
+#### Global Command (Optional)
+If you want to run `numdux` from any directory, install it globally using `pipx` or standard `pip`:
 ```bash
 # Install globally using pipx (recommended)
 pipx install .
@@ -113,7 +136,7 @@ pip install .
 ```
 Now you can start it from anywhere with just:
 ```bash
-numdux
+numdux run
 ```
 
 ---
@@ -124,19 +147,19 @@ By default, Numdux runs at `http://127.0.0.1:8000/`.
 
 - **Disable Auto-browser Open**:
   ```bash
-  numdux --no-browser
+  numdux run --no-browser
   ```
 - **Run in Developer Mode** (starts the hot-reloading Vite server at port 5173, requires Node.js/npm):
   ```bash
-  numdux --dev
+  numdux run --dev
   ```
 - **Enable Backend Live Reloading**:
   ```bash
-  numdux --reload
+  numdux run --reload
   ```
 - **Custom Ports**:
   ```bash
-  numdux --backend-port 8010
+  numdux run --backend-port 8010
   ```
 
 ## Configuration

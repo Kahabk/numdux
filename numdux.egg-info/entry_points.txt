@@ -1,0 +1,2 @@
+[console_scripts]
+numdux = backend.app.cli:main

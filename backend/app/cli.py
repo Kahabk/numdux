@@ -67,9 +67,18 @@ def terminate(processes: list[subprocess.Popen[bytes]]) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    if not command_exists("npm"):
-        print("Numdux needs npm to start the frontend. Install Node.js/npm, then run this again.", file=sys.stderr)
-        return 1
+    frontend_dir = Path(__file__).resolve().parent / "dist"
+    has_compiled_frontend = frontend_dir.exists() and (frontend_dir / "index.html").exists()
+    dev_mode = args.dev or not has_compiled_frontend
+
+    if dev_mode:
+        if not command_exists("npm"):
+            if args.dev:
+                print("Numdux needs npm to start the frontend in dev mode. Install Node.js/npm, then run this again.", file=sys.stderr)
+            else:
+                print("Compiled frontend not found. Attempting to start in dev mode, but npm is not installed.\n"
+                      "Please build the frontend using 'npm run build' or install Node.js/npm to run in dev mode.", file=sys.stderr)
+            return 1
 
     env = os.environ.copy()
     env["VITE_API_URL"] = f"http://{args.backend_host}:{args.backend_port}"
@@ -83,17 +92,6 @@ def run(args: argparse.Namespace) -> int:
         args.backend_host,
         "--port",
         str(args.backend_port),
-    ]
-    frontend_command = [
-        "npm",
-        "run",
-        "dev",
-        "--",
-        "--host",
-        args.frontend_host,
-        "--port",
-        str(args.frontend_port),
-        "--strictPort",
     ]
 
     if args.reload:
@@ -119,15 +117,30 @@ def run(args: argparse.Namespace) -> int:
         processes.append(backend)
         wait_for_port(args.backend_host, args.backend_port, backend, "backend")
 
-        print(f"Starting Numdux app on http://{args.frontend_host}:{args.frontend_port}")
-        frontend = start_process(frontend_command, env=env)
-        processes.append(frontend)
-        browser_host = "localhost" if args.frontend_host in {"0.0.0.0", "::"} else args.frontend_host
-        url = f"http://{browser_host}:{args.frontend_port}"
-        wait_for_port(browser_host, args.frontend_port, frontend, "frontend")
+        if dev_mode:
+            frontend_command = [
+                "npm",
+                "run",
+                "dev",
+                "--",
+                "--host",
+                args.frontend_host,
+                "--port",
+                str(args.frontend_port),
+                "--strictPort",
+            ]
+            print(f"Starting Numdux app on http://{args.frontend_host}:{args.frontend_port}")
+            frontend = start_process(frontend_command, env=env)
+            processes.append(frontend)
+            browser_host = "localhost" if args.frontend_host in {"0.0.0.0", "::"} else args.frontend_host
+            url = f"http://{browser_host}:{args.frontend_port}"
+            wait_for_port(browser_host, args.frontend_port, frontend, "frontend")
+        else:
+            browser_host = "localhost" if args.backend_host in {"0.0.0.0", "::"} else args.backend_host
+            url = f"http://{browser_host}:{args.backend_port}"
 
         print(f"\nNumdux is running: {url}")
-        print("Press Ctrl+C to stop the backend and frontend.")
+        print("Press Ctrl+C to stop.")
         if not args.no_browser:
             webbrowser.open(url)
 
@@ -156,12 +169,23 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--frontend-port", type=int, default=5173, help="Frontend port. Default: 5173")
     run_parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically.")
     run_parser.add_argument("--reload", action="store_true", help="Restart the backend when Python files change.")
+    run_parser.add_argument("--dev", action="store_true", help="Run in development mode (starts Vite dev server).")
     run_parser.set_defaults(func=run)
 
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    
+    # If no subcommand is specified, and the first argument isn't help or another known flag,
+    # default to "run"
+    if not argv:
+        argv = ["run"]
+    elif argv[0] not in ("run", "-h", "--help") and not any(arg in ("-h", "--help") for arg in argv):
+        argv = ["run"] + argv
+
     parser = build_parser()
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):

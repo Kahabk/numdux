@@ -1,8 +1,15 @@
-node_modules/
-dist/
-.numdux_data/
-.numdux_test/
-.env
-tsconfig.tsbuildinfo
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Large media
+banner.gif
+*.mp4
+*.mov
+
+# Python cache
 __pycache__/
 *.pyc
+*.so
