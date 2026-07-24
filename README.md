@@ -35,7 +35,7 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 ## Demo
 
 <p align="center">
-  <img src="banner.gif" alt="Numdux Notebook Demo" width="100%" />
+  <img src="output.gif" alt="Numdux Notebook Demo" width="100%" />
 </p>
 
 ### Roadmap
