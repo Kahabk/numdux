@@ -30,10 +30,22 @@ numdux/
 └── README.md           # Documentation & setup guide
 ```
 
-## 3. How to Pick a Task
+## 3. How to Pick a Task & Architectural Proposals
 
 - Browse open GitHub Issues labeled [`good first issue`](https://github.com/issues) for scoped, beginner-friendly tasks.
-- For larger or ambiguous architectural proposals (e.g., changes to the sandbox runner or AI workflow pipeline), please open an issue or leave a comment to discuss the design before starting work.
+- For larger or ambiguous architectural proposals (e.g., changes to the sandbox runner, AI workflow pipeline, or major roadmap modules), please open an issue with a short design document before submitting code.
+
+### Architectural Guidelines for Upcoming Roadmap Modules
+
+When contributing to or proposing designs for major upcoming modules, adhere to the following scope separation:
+
+1. **Market Simulation Lab (Synthetic Customer Persona Engine)**:
+   - **Modular Isolation**: Treat synthetic customer research as a distinct module separate from live commerce integrations (Shopify / CRO).
+   - **Pattern Consistency**: Leverage Numdux's existing staged pipeline and Model Lab sandbox execution patterns. Implement customer sub-agents as structured prompt templates (demographics, price sensitivity, behavioral traits) run in parallel, followed by response clustering and aggregation.
+   - **Realistic Positioning**: Design simulation outputs as **directional pre-launch signals** (identifying objections, value-prop friction, and cohort interest) rather than replacing real A/B testing on live traffic.
+   - **Empirical Calibration**: Incorporate mechanisms to calibrate persona distributions against real customer transaction data or validation slices.
+2. **Shopify & E-Commerce Connectors**: Keep store ingestion connectors isolated in dedicated backend data-source adapters.
+3. **Conversion Rate Optimization (CRO) & Experimentation**: Maintain CRO analytics (funnel analysis, live A/B test statistics) as a post-launch analytics tool distinct from pre-launch synthetic simulations.
 
 ## 4. Verification Before Opening a PR
 
