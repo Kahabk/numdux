@@ -1,0 +1,436 @@
+{
+  "instruction": "AUTO_AGENT_STAGE_ID: save_predict\nYou are the staged Auto AI agent. Run only this stage: Save and Predict.\nCurrent dataset version: v4; file sales_data_sample.csv; rows 2,823; columns 25; quality 100%.\nPrevious sandbox outputs and memory:\nauto_load_data_d1e0b9/task_8edc77e553; workflow=load_local_dataset->inspect_data->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_explore_data_813caf/task_ce94b232f2; workflow=load_local_dataset->explore_data->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_visualize_data_76b38c/task_bd3fa11506; workflow=load_local_dataset->visualize_data->validate_outputs; files=box_plot.png,cleaned.csv,cleaned.parquet,cleaning_manifest.json,correlation_heatmap.png,data_profile_summary.json,execution_summary.json,features.csv,histograms.png,missingness.png,pair_plot.png,pie_chart.png,prepared_features.csv,scatter_plot.png,validation_report.json; rows=2823\nauto_clean_data_76d719/task_a80bd6b502; workflow=load_local_dataset->clean_and_preprocess->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_feature_engineering_bfe819/task_699058ca88; workflow=load_local_dataset->feature_engineering->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_prepare_data_32eb54/task_163600ca55; workflow=load_local_dataset->feature_engineering->prepare_data->pca_variance->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,pca_features.csv,pca_variance.json,prepared_features.csv,validation_report.json; rows=2823; pca_variance=0.9546\nauto_split_data_657b1d/task_17af4d0d0b; workflow=load_local_dataset->feature_engineering->prepare_data->split_data->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,split_summary.json,validation_report.json; rows=2823\nauto_train_model_728983/task_89578b47b3; workflow=load_local_dataset->feature_engineering->prepare_data->split_data->train_model->evaluate_model->validate_outputs; files=best_model.joblib,box_plot.png,cleaned.csv,cleaned.parquet,cleaning_manifest.json,correlation_heatmap.png,data_profile_summary.json,execution_summary.json,feature_importance.png,features.csv,histograms.png,missingness.png,model_accuracy_report.json,model_comparison.json,model_comparison.png,pair_plot.png,pca_features.csv,pca_variance.json,pca_variance.png,pie_chart.png,prediction_review.png,predictions.csv,prepared_features.csv,scatter_plot.png,split_summary.json,validation_report.json; rows=2823; model_metric=r2:0.9366; pca_variance=0.9546\nauto_tune_evaluate_06dd09/task_2006c3d8cd; workflow=load_local_dataset->feature_engineering->prepare_data->split_data->train_model->evaluate_model->validate_outputs; files=best_model.joblib,box_plot.png,cleaned.csv,cleaned.parquet,cleaning_manifest.json,correlation_heatmap.png,data_profile_summary.json,execution_summary.json,feature_importance.png,features.csv,histograms.png,missingness.png,model_accuracy_report.json,model_comparison.json,model_comparison.png,pair_plot.png,pca_features.csv,pca_variance.json,pca_variance.png,pie_chart.png,prediction_review.png,predictions.csv,prepared_features.csv,scatter_plot.png,split_summary.json,validation_report.json; rows=2823; model_metric=r2:0.9366; pca_variance=0.9546\nThink step by step inside the code. Write auditable outputs, validation_report.json, execution_summary.json, and any requested review artifacts.\nDo not skip validation. Train, review whether improvement is needed, loop through stronger engineered features when needed, choose the best model by test performance with an overfit penalty, and retrain/retest before finalizing.\nSave the best model artifact, create predictions.csv, model_accuracy_report.json, confusion matrix files when available, histograms, review plots, and final sandbox summary.",
+  "workflow": [
+    "load_local_dataset",
+    "feature_engineering",
+    "prepare_data",
+    "split_data",
+    "train_model",
+    "evaluate_model",
+    "generate_predictions",
+    "validate_outputs"
+  ],
+  "local_input_path": "/home/user/numdux_projct/numdux/.numdux_data/runs/run_ffade11bb864/input/dataset.parquet",
+  "outputs": [
+    "cleaned.parquet",
+    "cleaned.csv",
+    "features.csv",
+    "prepared_features.csv",
+    "data_profile_summary.json",
+    "validation_report.json",
+    "execution_summary.json",
+    "split_summary.json",
+    "pca_features.csv",
+    "pca_variance.json",
+    "model_accuracy_report.json",
+    "model_comparison.json",
+    "best_model.joblib",
+    "histograms.png",
+    "pie_chart.png",
+    "scatter_plot.png",
+    "box_plot.png",
+    "correlation_heatmap.png",
+    "pair_plot.png",
+    "missingness.png",
+    "model_comparison.png",
+    "feature_importance.png",
+    "pca_variance.png",
+    "prediction_review.png"
+  ],
+  "steps": [
+    {
+      "step": "load_explore_data",
+      "detail": {
+        "rows": 2823,
+        "columns": 25,
+        "column_names": [
+          "ORDERNUMBER",
+          "QUANTITYORDERED",
+          "PRICEEACH",
+          "ORDERLINENUMBER",
+          "SALES",
+          "ORDERDATE",
+          "STATUS",
+          "QTR_ID",
+          "MONTH_ID",
+          "YEAR_ID",
+          "PRODUCTLINE",
+          "MSRP",
+          "PRODUCTCODE",
+          "CUSTOMERNAME",
+          "PHONE",
+          "ADDRESSLINE1",
+          "ADDRESSLINE2",
+          "CITY",
+          "STATE",
+          "POSTALCODE",
+          "COUNTRY",
+          "TERRITORY",
+          "CONTACTLASTNAME",
+          "CONTACTFIRSTNAME",
+          "DEALSIZE"
+        ],
+        "numeric_columns": [
+          "ORDERNUMBER",
+          "QUANTITYORDERED",
+          "PRICEEACH",
+          "ORDERLINENUMBER",
+          "SALES",
+          "QTR_ID",
+          "MONTH_ID",
+          "YEAR_ID",
+          "MSRP"
+        ],
+        "categorical_columns": [
+          "ORDERDATE",
+          "STATUS",
+          "PRODUCTLINE",
+          "PRODUCTCODE",
+          "CUSTOMERNAME",
+          "PHONE",
+          "ADDRESSLINE1",
+          "ADDRESSLINE2",
+          "CITY",
+          "STATE",
+          "POSTALCODE",
+          "COUNTRY",
+          "TERRITORY",
+          "CONTACTLASTNAME",
+          "CONTACTFIRSTNAME",
+          "DEALSIZE"
+        ],
+        "missing_values": {
+          "ORDERNUMBER": 0,
+          "QUANTITYORDERED": 0,
+          "PRICEEACH": 0,
+          "ORDERLINENUMBER": 0,
+          "SALES": 0,
+          "ORDERDATE": 0,
+          "STATUS": 0,
+          "QTR_ID": 0,
+          "MONTH_ID": 0,
+          "YEAR_ID": 0,
+          "PRODUCTLINE": 0,
+          "MSRP": 0,
+          "PRODUCTCODE": 0,
+          "CUSTOMERNAME": 0,
+          "PHONE": 0,
+          "ADDRESSLINE1": 0,
+          "ADDRESSLINE2": 0,
+          "CITY": 0,
+          "STATE": 0,
+          "POSTALCODE": 0,
+          "COUNTRY": 0,
+          "TERRITORY": 0,
+          "CONTACTLASTNAME": 0,
+          "CONTACTFIRSTNAME": 0,
+          "DEALSIZE": 0
+        },
+        "duplicate_rows": 0,
+        "outliers_iqr": {
+          "ORDERNUMBER": 0,
+          "QUANTITYORDERED": 0,
+          "PRICEEACH": 0,
+          "ORDERLINENUMBER": 0,
+          "SALES": 0,
+          "QTR_ID": 0,
+          "MONTH_ID": 0,
+          "YEAR_ID": 0,
+          "MSRP": 0
+        },
+        "target_hint": "SALES"
+      },
+      "timestamp": "2026-07-27T14:37:53.135416Z"
+    },
+    {
+      "step": "feature_engineering",
+      "detail": {
+        "feature_columns": 87
+      },
+      "timestamp": "2026-07-27T14:37:53.151365Z"
+    },
+    {
+      "step": "prepare_data_encoding_scaling",
+      "detail": {
+        "prepared_columns": 8,
+        "scaled_numeric": true
+      },
+      "timestamp": "2026-07-27T14:37:53.426440Z"
+    },
+    {
+      "step": "pca_variance",
+      "detail": {
+        "status": "success",
+        "input_features": 8,
+        "kept_components": 5,
+        "explained_variance_ratio": [
+          0.30854021354818595,
+          0.2091842437490933,
+          0.1891278516776608,
+          0.12512486441513482,
+          0.12266797479113317
+        ],
+        "cumulative_variance": 0.9546451481812079
+      },
+      "timestamp": "2026-07-27T14:37:53.468992Z"
+    },
+    {
+      "step": "feature_model_loop",
+      "detail": {
+        "iteration": 1,
+        "feature_set": "baseline_features",
+        "actions": [
+          "use the prepared feature table"
+        ],
+        "feature_count": 8
+      },
+      "timestamp": "2026-07-27T14:37:53.489582Z"
+    },
+    {
+      "step": "ai_model_review",
+      "detail": {
+        "iteration": 1,
+        "feature_set": "baseline_features",
+        "best_model": "random_forest",
+        "review": {
+          "needs_improvement": false,
+          "reason": "regression score is strong and overfit gap is controlled",
+          "score": 0.9365524482394685,
+          "overfit_gap": 0.033813287517838075
+        },
+        "actions": [
+          "use the prepared feature table"
+        ]
+      },
+      "timestamp": "2026-07-27T14:37:56.935102Z"
+    },
+    {
+      "step": "train_evaluate_model",
+      "detail": {
+        "status": "success",
+        "target": "SALES",
+        "task_type": "regression",
+        "model": "random_forest",
+        "feature_set": "baseline_features",
+        "loop_iteration": 1,
+        "rows_train": 2258,
+        "rows_test": 565,
+        "metrics": {
+          "r2": 0.9365524482394685,
+          "mae": 251.13299018685336
+        },
+        "overfit_gap": 0.033813287517838075,
+        "ai_review": {
+          "needs_improvement": false,
+          "reason": "regression score is strong and overfit gap is controlled",
+          "score": 0.9365524482394685,
+          "overfit_gap": 0.033813287517838075
+        },
+        "feature_loop": [
+          {
+            "iteration": 1,
+            "feature_set": "baseline_features",
+            "best_model": "random_forest",
+            "review": {
+              "needs_improvement": false,
+              "reason": "regression score is strong and overfit gap is controlled",
+              "score": 0.9365524482394685,
+              "overfit_gap": 0.033813287517838075
+            },
+            "actions": [
+              "use the prepared feature table"
+            ]
+          }
+        ],
+        "model_comparison": [
+          {
+            "name": "linear_regression",
+            "feature_set": "baseline_features",
+            "loop_iteration": 1,
+            "feature_count": 8,
+            "train_score": 0.8272438851611791,
+            "test_score": 0.8185833748545868,
+            "overfit_gap": 0.008660510306592317,
+            "penalized_score": 0.8185833748545868,
+            "metrics": {
+              "r2": 0.8185833748545868,
+              "mae": 573.188021296393
+            },
+            "best_params": {}
+          },
+          {
+            "name": "random_forest",
+            "feature_set": "baseline_features",
+            "loop_iteration": 1,
+            "feature_count": 8,
+            "train_score": 0.9703657357573066,
+            "test_score": 0.9365524482394685,
+            "overfit_gap": 0.033813287517838075,
+            "penalized_score": 0.9365524482394685,
+            "metrics": {
+              "r2": 0.9365524482394685,
+              "mae": 251.13299018685336
+            },
+            "best_params": {
+              "max_depth": null,
+              "min_samples_leaf": 3,
+              "n_estimators": 140
+            }
+          },
+          {
+            "name": "gradient_boosting",
+            "feature_set": "baseline_features",
+            "loop_iteration": 1,
+            "feature_count": 8,
+            "train_score": 0.9445913545184496,
+            "test_score": 0.9318548983391446,
+            "overfit_gap": 0.012736456179304967,
+            "penalized_score": 0.9318548983391446,
+            "metrics": {
+              "r2": 0.9318548983391446,
+              "mae": 272.263179503965
+            },
+            "best_params": {
+              "learning_rate": 0.1,
+              "max_depth": 3,
+              "n_estimators": 80
+            }
+          }
+        ],
+        "confusion_matrix": {
+          "status": "not_classification"
+        },
+        "feature_importance": [
+          {
+            "feature": "PRICEEACH",
+            "importance": 0.5455967585213319
+          },
+          {
+            "feature": "QUANTITYORDERED",
+            "importance": 0.3333112817354181
+          },
+          {
+            "feature": "MSRP",
+            "importance": 0.09226534545194516
+          },
+          {
+            "feature": "ORDERNUMBER",
+            "importance": 0.014024419289504765
+          },
+          {
+            "feature": "ORDERLINENUMBER",
+            "importance": 0.007324299551493055
+          },
+          {
+            "feature": "MONTH_ID",
+            "importance": 0.005496106639328946
+          },
+          {
+            "feature": "QTR_ID",
+            "importance": 0.0012738616107814491
+          },
+          {
+            "feature": "YEAR_ID",
+            "importance": 0.0007079272001966782
+          }
+        ],
+        "predictions_preview": [
+          {
+            "actual": 1536.57,
+            "prediction": 1519.6716234693872
+          },
+          {
+            "actual": 2168.5,
+            "prediction": 2180.8018290326745
+          },
+          {
+            "actual": 4351.23,
+            "prediction": 4637.850620977634
+          },
+          {
+            "actual": 3880.2,
+            "prediction": 3501.7762859049685
+          },
+          {
+            "actual": 3042.68,
+            "prediction": 3040.021553148438
+          },
+          {
+            "actual": 7964.855,
+            "prediction": 6866.717070140179
+          },
+          {
+            "actual": 7827.3,
+            "prediction": 5683.631162126368
+          },
+          {
+            "actual": 1672.1,
+            "prediction": 1662.3832553803338
+          },
+          {
+            "actual": 2328.66,
+            "prediction": 2268.4122605390635
+          },
+          {
+            "actual": 7964.855,
+            "prediction": 7586.620666184807
+          },
+          {
+            "actual": 2574.18,
+            "prediction": 2585.66363409091
+          },
+          {
+            "actual": 2151.82,
+            "prediction": 2168.0676308415796
+          },
+          {
+            "actual": 703.6,
+            "prediction": 736.9013428571429
+          },
+          {
+            "actual": 4468.4,
+            "prediction": 4775.219714802857
+          },
+          {
+            "actual": 5566.0,
+            "prediction": 5570.41170541383
+          },
+          {
+            "actual": 6934.62,
+            "prediction": 5749.557542708081
+          },
+          {
+            "actual": 1611.36,
+            "prediction": 1598.35583496444
+          },
+          {
+            "actual": 5704.32,
+            "prediction": 5822.0888289283175
+          },
+          {
+            "actual": 2280.24,
+            "prediction": 2296.542645575854
+          },
+          {
+            "actual": 972.4,
+            "prediction": 991.7311932101629
+          }
+        ],
+        "pca": {
+          "status": "success",
+          "input_features": 8,
+          "kept_components": 5,
+          "explained_variance_ratio": [
+            0.30854021354818595,
+            0.2091842437490933,
+            0.1891278516776608,
+            0.12512486441513482,
+            0.12266797479113317
+          ],
+          "cumulative_variance": 0.9546451481812079
+        }
+      },
+      "timestamp": "2026-07-27T14:37:57.003846Z"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "status": "passed",
+  "workflow": [
+    "load_local_dataset",
+    "feature_engineering",
+    "prepare_data",
+    "split_data",
+    "validate_outputs"
+  ],
+  "checks": [
+    {
+      "name": "local_dataset_loaded",
+      "passed": true
+    },
+    {
+      "name": "cleaned_dataset_written",
+      "passed": true
+    },
+    {
+      "name": "columns_available",
+      "passed": true
+    },
+    {
+      "name": "required_plots_written",
+      "passed": true,
+      "missing_files": []
+    }
+  ],
+  "metrics": {
+    "nulls_before": {
+      "ORDERNUMBER": 0,
+      "QUANTITYORDERED": 0,
+      "PRICEEACH": 0,
+      "ORDERLINENUMBER": 0,
+      "SALES": 0,
+      "ORDERDATE": 0,
+      "STATUS": 0,
+      "QTR_ID": 0,
+      "MONTH_ID": 0,
+      "YEAR_ID": 0,
+      "PRODUCTLINE": 0,
+      "MSRP": 0,
+      "PRODUCTCODE": 0,
+      "CUSTOMERNAME": 0,
+      "PHONE": 0,
+      "ADDRESSLINE1": 0,
+      "ADDRESSLINE2": 0,
+      "CITY": 0,
+      "STATE": 0,
+      "POSTALCODE": 0,
+      "COUNTRY": 0,
+      "TERRITORY": 0,
+      "CONTACTLASTNAME": 0,
+      "CONTACTFIRSTNAME": 0,
+      "DEALSIZE": 0
+    },
+    "nulls_after": {
+      "ORDERNUMBER": 0,
+      "QUANTITYORDERED": 0,
+      "PRICEEACH": 0,
+      "ORDERLINENUMBER": 0,
+      "SALES": 0,
+      "ORDERDATE": 0,
+      "STATUS": 0,
+      "QTR_ID": 0,
+      "MONTH_ID": 0,
+      "YEAR_ID": 0,
+      "PRODUCTLINE": 0,
+      "MSRP": 0,
+      "PRODUCTCODE": 0,
+      "CUSTOMERNAME": 0,
+      "PHONE": 0,
+      "ADDRESSLINE1": 0,
+      "ADDRESSLINE2": 0,
+      "CITY": 0,
+      "STATE": 0,
+      "POSTALCODE": 0,
+      "COUNTRY": 0,
+      "TERRITORY": 0,
+      "CONTACTLASTNAME": 0,
+      "CONTACTFIRSTNAME": 0,
+      "DEALSIZE": 0
+    },
+    "duplicates_before": 0,
+    "duplicates_after": 0,
+    "transformed_values": 0
+  },
+  "model": {
+    "status": "not_requested"
+  },
+  "pca": {
+    "status": "not_requested"
+  },
+  "plots": [],
+  "plot_errors": [],
+  "missing_required_plots": []
+}

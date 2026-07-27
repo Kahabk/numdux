@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BarChart3, Save, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts";
 import { createChartConfig, deleteChartConfig, listChartConfigs, queryDatasetVersion } from "../lib/api";
 import type { ChartAgg, ChartConfig, ChartFilter, ChartType, DatasetQueryResult, UploadResponse } from "../lib/types";
@@ -18,7 +18,7 @@ const CHART_TYPES: Array<{ value: ChartType; label: string }> = [
 const AGGS: ChartAgg[] = ["count", "sum", "mean", "min", "max"];
 const OPERATORS: ChartFilter["operator"][] = ["=", "!=", ">", ">=", "<", "<=", "contains", "not_contains", "is_null", "not_null"];
 
-export function GraphStudio({ dataset, onReportChanged }: { dataset: UploadResponse; onReportChanged?: () => void }) {
+export const GraphStudio = memo(function GraphStudio({ dataset, onReportChanged }: { dataset: UploadResponse; onReportChanged?: () => void }) {
   const headVersionId = dataset.versions[dataset.versions.length - 1]?.id ?? dataset.profile.version_id;
   const numericColumns = dataset.profile.column_metadata.filter((column) => column.inferred_type === "numeric").map((column) => column.name);
   const allColumns = dataset.profile.column_metadata.map((column) => column.name);
@@ -102,9 +102,9 @@ export function GraphStudio({ dataset, onReportChanged }: { dataset: UploadRespo
       </div>
     </div>
   );
-}
+});
 
-export function GraphPreview({ chartType, result, xField, yField }: { chartType: ChartType; result?: DatasetQueryResult | { data: Record<string, unknown>[]; columns: string[] }; xField: string; yField: string }) {
+export const GraphPreview = memo(function GraphPreview({ chartType, result, xField, yField }: { chartType: ChartType; result?: DatasetQueryResult | { data: Record<string, unknown>[]; columns: string[] }; xField: string; yField: string }) {
   const data = result?.data ?? [];
   if (!data.length) return <div className="pipeline-empty">No aggregated chart data yet.</div>;
   if (chartType === "heatmap") return <Heatmap data={data} />;
@@ -115,7 +115,7 @@ export function GraphPreview({ chartType, result, xField, yField }: { chartType:
     return <ResponsiveContainer width="100%" height={280}><LineChart data={data}><CartesianGrid stroke="#2a2a2a" /><XAxis dataKey={dataKey(data, xField)} tick={{ fill: "#9a9a9a", fontSize: 11 }} /><YAxis tick={{ fill: "#9a9a9a", fontSize: 11 }} /><Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #2a2a2a" }} /><Line type="monotone" dataKey={dataKey(data, yField)} stroke="#6c8cff" dot={false} /></LineChart></ResponsiveContainer>;
   }
   return <ResponsiveContainer width="100%" height={280}><ScatterChart><CartesianGrid stroke="#2a2a2a" /><XAxis dataKey={dataKey(data, xField)} tick={{ fill: "#9a9a9a", fontSize: 11 }} /><YAxis dataKey={dataKey(data, yField)} tick={{ fill: "#9a9a9a", fontSize: 11 }} /><ZAxis range={[50, 80]} /><Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #2a2a2a" }} /><Scatter data={data} fill="#6c8cff" /></ScatterChart></ResponsiveContainer>;
-}
+});
 
 function Heatmap({ data }: { data: Record<string, unknown>[] }) {
   const max = Math.max(...data.map((item) => Math.abs(Number(item.value) || 0)), 1);

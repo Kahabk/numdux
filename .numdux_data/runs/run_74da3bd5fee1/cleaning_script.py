@@ -1,0 +1,684 @@
+import json
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+TASK = {'stage_id': 'prepare_data', 'instruction': 'AUTO_AGENT_STAGE_ID: prepare_data\nYou are the staged Auto AI agent. Run only this stage: Prepare Data (Encoding & Scaling).\nCurrent dataset version: v3; file sales_data_sample.csv; rows 2,823; columns 25; quality 100%.\nPrevious sandbox outputs and memory:\nauto_load_data_d1e0b9/task_8edc77e553; workflow=load_local_dataset->inspect_data->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_explore_data_813caf/task_ce94b232f2; workflow=load_local_dataset->explore_data->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_visualize_data_76b38c/task_bd3fa11506; workflow=load_local_dataset->visualize_data->validate_outputs; files=box_plot.png,cleaned.csv,cleaned.parquet,cleaning_manifest.json,correlation_heatmap.png,data_profile_summary.json,execution_summary.json,features.csv,histograms.png,missingness.png,pair_plot.png,pie_chart.png,prepared_features.csv,scatter_plot.png,validation_report.json; rows=2823\nauto_clean_data_76d719/task_a80bd6b502; workflow=load_local_dataset->clean_and_preprocess->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nauto_feature_engineering_bfe819/task_699058ca88; workflow=load_local_dataset->feature_engineering->validate_outputs; files=cleaned.csv,cleaned.parquet,cleaning_manifest.json,data_profile_summary.json,execution_summary.json,features.csv,prepared_features.csv,validation_report.json; rows=2823\nThink step by step inside the code. Write auditable outputs, validation_report.json, execution_summary.json, and any requested review artifacts.\nDo not skip validation. Do not train a model in this stage.\nPrepare data for modeling. Encode categorical features, scale numeric features, analyze variance/PCA when useful, and save prepared_features.csv, pca_features.csv, and pca_variance.json.', 'workflow': ['load_local_dataset', 'feature_engineering', 'prepare_data', 'pca_variance', 'validate_outputs'], 'target_hint': 'SALES', 'filter_hint': None, 'wants_model': False, 'wants_features': True, 'wants_pca': True, 'wants_plots': False, 'wants_auto_ml': False, 'wants_outliers': False, 'wants_inspection': True, 'wants_split': False, 'required_plot_files': []}
+INPUT_PATH = Path("/home/user/numdux_projct/numdux/.numdux_data/runs/run_74da3bd5fee1/input/dataset.parquet")
+OUTPUT_DIR = Path("/home/user/numdux_projct/numdux/.numdux_data/runs/run_74da3bd5fee1/output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_frame(path):
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    if suffix in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
+    if suffix == ".jsonl":
+        return pd.read_json(path, lines=True)
+    if suffix == ".json":
+        return pd.read_json(path)
+    sep = "\t" if suffix == ".tsv" else ","
+    try:
+        return pd.read_csv(path, sep=sep, low_memory=False)
+    except Exception:
+        try:
+            return pd.read_csv(path, sep=sep, low_memory=False, encoding="latin1")
+        except Exception:
+            try:
+                return pd.read_csv(path, sep=sep, low_memory=False, encoding="cp1252")
+            except Exception:
+                return pd.read_csv(path, sep=sep, low_memory=False, encoding="utf-8", errors="replace")
+
+def json_default(value):
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        return None if not np.isfinite(value) else float(value)
+    if isinstance(value, (np.ndarray,)):
+        return value.tolist()
+    return str(value)
+
+df = load_frame(INPUT_PATH)
+original_shape = df.shape
+before_nulls = df.isna().sum().to_dict()
+before_duplicates = int(df.duplicated().sum())
+steps = []
+
+def record(name, detail):
+    steps.append({"step": name, "detail": detail, "timestamp": datetime.utcnow().isoformat() + "Z"})
+
+numeric_source = df.select_dtypes(include=[np.number])
+categorical_source = df.select_dtypes(include=["object", "string", "category"])
+outlier_summary = {}
+for column in numeric_source.columns:
+    series = pd.to_numeric(df[column], errors="coerce")
+    q1 = series.quantile(0.25)
+    q3 = series.quantile(0.75)
+    iqr = q3 - q1
+    if pd.notna(iqr) and iqr > 0:
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        outlier_summary[str(column)] = int(((series < lower) | (series > upper)).sum())
+profile_summary = {
+    "rows": int(df.shape[0]),
+    "columns": int(df.shape[1]),
+    "column_names": [str(column) for column in df.columns],
+    "numeric_columns": [str(column) for column in numeric_source.columns],
+    "categorical_columns": [str(column) for column in categorical_source.columns],
+    "missing_values": {str(k): int(v) for k, v in before_nulls.items()},
+    "duplicate_rows": before_duplicates,
+    "outliers_iqr": outlier_summary,
+    "target_hint": TASK.get("target_hint"),
+}
+(OUTPUT_DIR / "data_profile_summary.json").write_text(json.dumps(profile_summary, indent=2, default=json_default))
+record("load_explore_data", profile_summary)
+
+filter_hint = TASK.get("filter_hint") or {}
+if filter_hint.get("column") in df.columns:
+    column = filter_hint["column"]
+    before_filter = int(len(df))
+    value = filter_hint.get("value")
+    op = filter_hint.get("op")
+    series = df[column]
+    numeric_series = pd.to_numeric(series, errors="coerce")
+    numeric_value = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    if op in [">", ">=", "<", "<="] and pd.notna(numeric_value):
+        if op == ">":
+            df = df[numeric_series > numeric_value]
+        elif op == ">=":
+            df = df[numeric_series >= numeric_value]
+        elif op == "<":
+            df = df[numeric_series < numeric_value]
+        elif op == "<=":
+            df = df[numeric_series <= numeric_value]
+    elif op in ["=", "=="]:
+        df = df[series.astype(str).str.lower() == str(value).lower()]
+    elif op == "contains":
+        df = df[series.astype(str).str.contains(str(value), case=False, na=False)]
+    df = df.reset_index(drop=True)
+    record("filter_rows", {"column": column, "op": op, "value": value, "rows_before": before_filter, "rows_after": int(len(df))})
+
+if "clean_and_preprocess" in TASK["workflow"] and before_duplicates:
+    df = df.drop_duplicates().reset_index(drop=True)
+    record("remove_duplicates", {"rows_removed": before_duplicates})
+
+if "clean_and_preprocess" in TASK["workflow"]:
+    for column in list(df.columns):
+        series = df[column]
+        if series.dtype == object or str(series.dtype).startswith("string"):
+            cleaned = series.astype("string").str.strip()
+            cleaned = cleaned.replace({"": pd.NA, "na": pd.NA, "n/a": pd.NA, "null": pd.NA, "none": pd.NA})
+            df[column] = cleaned
+        numeric = pd.to_numeric(df[column], errors="coerce")
+        if len(df) and numeric.notna().mean() > 0.85:
+            median = numeric.median()
+            df[column] = numeric.fillna(median if pd.notna(median) else 0)
+        elif df[column].isna().any():
+            mode = df[column].mode(dropna=True)
+            df[column] = df[column].fillna(mode.iloc[0] if not mode.empty else "unknown")
+    if TASK.get("wants_outliers"):
+        for column in df.select_dtypes(include=[np.number]).columns:
+            series = pd.to_numeric(df[column], errors="coerce")
+            q1 = series.quantile(0.25)
+            q3 = series.quantile(0.75)
+            iqr = q3 - q1
+            if pd.notna(iqr) and iqr > 0:
+                lower = q1 - 1.5 * iqr
+                upper = q3 + 1.5 * iqr
+                affected = int(((series < lower) | (series > upper)).sum())
+                if affected:
+                    df[column] = series.clip(lower, upper)
+                    record("cap_outliers", {"column": str(column), "rows_capped": affected, "lower": float(lower), "upper": float(upper)})
+    record("clean_and_preprocess", {"rows": int(df.shape[0]), "columns": int(df.shape[1])})
+
+feature_frame = df.copy()
+target = TASK.get("target_hint")
+if (TASK["wants_model"] or TASK.get("wants_split")) and target not in df.columns:
+    candidates = [c for c in df.columns if 1 < df[c].nunique(dropna=True) <= max(20, int(len(df) * 0.5))]
+    target = candidates[-1] if candidates else df.columns[-1] if len(df.columns) else None
+if target in feature_frame.columns:
+    feature_frame = feature_frame.drop(columns=[target])
+if TASK["wants_features"]:
+    for column in feature_frame.select_dtypes(include=["object", "string", "category"]).columns:
+        if feature_frame[column].nunique(dropna=True) <= 30:
+            dummies = pd.get_dummies(feature_frame[column], prefix=str(column), dummy_na=True)
+            feature_frame = pd.concat([feature_frame.drop(columns=[column]), dummies], axis=1)
+    for column in feature_frame.columns:
+        if feature_frame[column].dtype == bool:
+            feature_frame[column] = feature_frame[column].astype(int)
+    record("feature_engineering", {"feature_columns": int(feature_frame.shape[1])})
+
+pca_result = {"status": "not_requested"}
+numeric_features = feature_frame.select_dtypes(include=[np.number]).replace([np.inf, -np.inf], np.nan).fillna(0)
+prepared_features = numeric_features.copy()
+if TASK["wants_features"] and prepared_features.shape[1] > 0:
+    try:
+        from sklearn.preprocessing import StandardScaler
+        scaled_values = StandardScaler().fit_transform(prepared_features)
+        prepared_features = pd.DataFrame(scaled_values, columns=[str(column) for column in prepared_features.columns])
+        record("prepare_data_encoding_scaling", {"prepared_columns": int(prepared_features.shape[1]), "scaled_numeric": True})
+    except Exception as exc:
+        record("prepare_data_error", {"error": str(exc)})
+if TASK.get("wants_pca") and numeric_features.shape[1] >= 2 and len(numeric_features) >= 3:
+    try:
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+
+        scaled = StandardScaler().fit_transform(numeric_features)
+        max_components = max(1, min(numeric_features.shape[1], len(numeric_features) - 1))
+        pca = PCA(n_components=max_components, random_state=42)
+        components = pca.fit_transform(scaled)
+        cumulative = np.cumsum(pca.explained_variance_ratio_)
+        kept_components = int(np.searchsorted(cumulative, 0.9) + 1)
+        kept_components = max(1, min(kept_components, max_components))
+        pca_frame = pd.DataFrame(components[:, :kept_components], columns=[f"pca_{index + 1}" for index in range(kept_components)])
+        pca_frame.to_csv(OUTPUT_DIR / "pca_features.csv", index=False)
+        pca_result = {
+            "status": "success",
+            "input_features": int(numeric_features.shape[1]),
+            "kept_components": kept_components,
+            "explained_variance_ratio": [float(value) for value in pca.explained_variance_ratio_[:kept_components]],
+            "cumulative_variance": float(cumulative[kept_components - 1]),
+        }
+        (OUTPUT_DIR / "pca_variance.json").write_text(json.dumps(pca_result, indent=2, default=json_default))
+        record("pca_variance", pca_result)
+    except Exception as exc:
+        pca_result = {"status": "failed", "error": str(exc)}
+        record("pca_error", pca_result)
+
+if TASK.get("wants_split") and not TASK["wants_model"] and target in df.columns and len(df) >= 5:
+    try:
+        from sklearn.model_selection import train_test_split
+        X_split = prepared_features.copy()
+        if X_split.shape[1] == 0:
+            X_split = pd.DataFrame({"row_number": np.arange(len(df))})
+        y_split = df[target]
+        is_classification_split = y_split.dtype == object or str(y_split.dtype).startswith("string") or y_split.nunique(dropna=True) <= 20
+        stratify_split = y_split if is_classification_split and y_split.nunique(dropna=True) > 1 and y_split.nunique(dropna=True) <= 20 else None
+        try:
+            X_train_preview, X_test_preview, y_train_preview, y_test_preview = train_test_split(X_split, y_split, test_size=0.2, random_state=42, stratify=stratify_split)
+        except Exception:
+            X_train_preview, X_test_preview, y_train_preview, y_test_preview = train_test_split(X_split, y_split, test_size=0.2, random_state=42)
+        split_summary = {
+            "target": str(target),
+            "task_type": "classification" if is_classification_split else "regression",
+            "rows_total": int(len(X_split)),
+            "rows_train": int(len(X_train_preview)),
+            "rows_test": int(len(X_test_preview)),
+            "feature_count": int(X_split.shape[1]),
+            "stratified": bool(stratify_split is not None),
+        }
+        (OUTPUT_DIR / "split_summary.json").write_text(json.dumps(split_summary, indent=2, default=json_default))
+        record("split_data", split_summary)
+    except Exception as exc:
+        record("split_data_error", {"error": str(exc)})
+
+model_result = {"status": "not_requested"}
+predictions_rows = []
+if TASK["wants_model"] and target in df.columns and len(df) >= 5:
+    y = df[target]
+    X = prepared_features.copy()
+    if X.shape[1] == 0:
+        X = pd.DataFrame({"row_number": np.arange(len(df))})
+    try:
+        from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
+        from sklearn.linear_model import LinearRegression, LogisticRegression
+        from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, mean_absolute_error, r2_score
+        from sklearn.model_selection import GridSearchCV, train_test_split
+
+        is_classification = y.dtype == object or str(y.dtype).startswith("string") or y.nunique(dropna=True) <= 20
+        if is_classification:
+            candidates = [
+                ("logistic_regression", LogisticRegression(max_iter=500)),
+                ("random_forest", RandomForestClassifier(n_estimators=120, random_state=42, n_jobs=-1)),
+                ("gradient_boosting", GradientBoostingClassifier(random_state=42)),
+            ]
+            grids = {
+                "random_forest": {"n_estimators": [80, 140], "max_depth": [None, 6, 12], "min_samples_leaf": [1, 3]},
+                "gradient_boosting": {"n_estimators": [80, 140], "learning_rate": [0.05, 0.1], "max_depth": [2, 3]},
+                "logistic_regression": {"C": [0.3, 1.0, 3.0]},
+            }
+        else:
+            candidates = [
+                ("linear_regression", LinearRegression()),
+                ("random_forest", RandomForestRegressor(n_estimators=120, random_state=42, n_jobs=-1)),
+                ("gradient_boosting", GradientBoostingRegressor(random_state=42)),
+            ]
+            grids = {
+                "random_forest": {"n_estimators": [80, 140], "max_depth": [None, 6, 12], "min_samples_leaf": [1, 3]},
+                "gradient_boosting": {"n_estimators": [80, 140], "learning_rate": [0.05, 0.1], "max_depth": [2, 3]},
+            }
+
+        def make_feature_variants(base_X):
+            clean_base = base_X.replace([np.inf, -np.inf], np.nan).fillna(0).copy()
+            variants = [("baseline_features", clean_base, ["use the prepared feature table"])]
+            if clean_base.shape[1] >= 3:
+                variances = clean_base.var(numeric_only=True).sort_values(ascending=False)
+                keep = [column for column in variances.index if float(variances[column]) > 1e-10]
+                selected = clean_base[keep[: min(len(keep), 80)]].copy() if keep else clean_base.copy()
+                if 0 < selected.shape[1] < clean_base.shape[1]:
+                    corr = selected.corr(numeric_only=True).abs()
+                    upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
+                    drop = [column for column in upper.columns if any(upper[column] > 0.98)]
+                    selected = selected.drop(columns=drop, errors="ignore")
+                    if selected.shape[1] > 0:
+                        variants.append(("selected_low_leakage_features", selected, ["drop near-constant features", "drop highly correlated duplicates"]))
+            if clean_base.shape[1] >= 2 and clean_base.shape[1] <= 80:
+                variances = clean_base.var(numeric_only=True).sort_values(ascending=False)
+                top_columns = [column for column in variances.index[: min(4, len(variances.index))]]
+                enriched = clean_base.copy()
+                for left_index, left in enumerate(top_columns):
+                    for right in top_columns[left_index + 1:]:
+                        enriched[f"{left}__x__{right}"] = clean_base[left] * clean_base[right]
+                for column in top_columns:
+                    enriched[f"{column}__squared"] = clean_base[column] ** 2
+                if enriched.shape[1] > clean_base.shape[1]:
+                    variants.append(("interaction_features", enriched.replace([np.inf, -np.inf], np.nan).fillna(0), ["add pairwise interactions", "add squared high-variance terms"]))
+            return variants[:3]
+
+        def review_result(comparison):
+            score = float(comparison.get("test_score", 0.0))
+            gap = float(comparison.get("overfit_gap", 0.0))
+            if is_classification:
+                good_enough = score >= 0.92 and gap <= 0.12
+                reason = "classification score is strong and overfit gap is controlled" if good_enough else "classification score or overfit gap needs improvement"
+            else:
+                good_enough = score >= 0.85 and gap <= 0.15
+                reason = "regression score is strong and overfit gap is controlled" if good_enough else "regression score or overfit gap needs improvement"
+            return {"needs_improvement": not good_enough, "reason": reason, "score": score, "overfit_gap": gap}
+
+        feature_variants = make_feature_variants(X)
+        comparisons = []
+        loop_reviews = []
+        best = None
+        for loop_index, (feature_set_name, candidate_X, feature_actions) in enumerate(feature_variants, start=1):
+            stratify = y if is_classification and y.nunique(dropna=True) > 1 and y.nunique(dropna=True) <= 20 else None
+            try:
+                X_train, X_test, y_train, y_test = train_test_split(candidate_X, y, test_size=0.2, random_state=42, stratify=stratify)
+            except Exception:
+                X_train, X_test, y_train, y_test = train_test_split(candidate_X, y, test_size=0.2, random_state=42)
+            split_summary = {
+                "target": str(target),
+                "task_type": "classification" if is_classification else "regression",
+                "rows_total": int(len(candidate_X)),
+                "rows_train": int(len(X_train)),
+                "rows_test": int(len(X_test)),
+                "feature_count": int(candidate_X.shape[1]),
+                "feature_set": feature_set_name,
+                "loop_iteration": loop_index,
+                "stratified": bool(stratify is not None),
+            }
+            if loop_index == 1:
+                (OUTPUT_DIR / "split_summary.json").write_text(json.dumps(split_summary, indent=2, default=json_default))
+            record("feature_model_loop", {"iteration": loop_index, "feature_set": feature_set_name, "actions": feature_actions, "feature_count": int(candidate_X.shape[1])})
+            loop_best = None
+            for name, base_model in candidates:
+                estimator = base_model
+                best_params = {}
+                if TASK.get("wants_auto_ml") and name in grids and len(X_train) >= 8:
+                    cv_splits = min(3, len(X_train))
+                    if is_classification:
+                        class_counts = pd.Series(y_train).value_counts()
+                        if len(class_counts):
+                            cv_splits = min(cv_splits, int(class_counts.min()))
+                    if cv_splits >= 2:
+                        scoring = "accuracy" if is_classification else "r2"
+                        search = GridSearchCV(base_model, grids[name], cv=cv_splits, scoring=scoring, n_jobs=-1)
+                        search.fit(X_train, y_train)
+                        estimator = search.best_estimator_
+                        best_params = search.best_params_
+                estimator.fit(X_train, y_train)
+                train_pred = estimator.predict(X_train)
+                test_pred = estimator.predict(X_test)
+                if is_classification:
+                    train_score = float(accuracy_score(y_train, train_pred))
+                    test_score = float(accuracy_score(y_test, test_pred))
+                    metrics = {"accuracy": test_score, "f1": float(f1_score(y_test, test_pred, average="weighted", zero_division=0))}
+                else:
+                    train_score = float(r2_score(y_train, train_pred))
+                    test_score = float(r2_score(y_test, test_pred))
+                    metrics = {"r2": test_score, "mae": float(mean_absolute_error(y_test, test_pred))}
+                overfit_gap = float(train_score - test_score)
+                penalized_score = test_score - max(0.0, overfit_gap - 0.12)
+                comparison = {
+                    "name": name,
+                    "feature_set": feature_set_name,
+                    "loop_iteration": loop_index,
+                    "feature_count": int(candidate_X.shape[1]),
+                    "train_score": train_score,
+                    "test_score": test_score,
+                    "overfit_gap": overfit_gap,
+                    "penalized_score": penalized_score,
+                    "metrics": metrics,
+                    "best_params": best_params,
+                }
+                comparisons.append(comparison)
+                if loop_best is None or comparison["penalized_score"] > loop_best["comparison"]["penalized_score"]:
+                    loop_best = {"name": name, "model": estimator, "comparison": comparison, "pred": test_pred, "X": candidate_X, "X_train": X_train, "X_test": X_test, "y_test": y_test, "feature_actions": feature_actions}
+            if loop_best is not None:
+                review = review_result(loop_best["comparison"])
+                loop_reviews.append({"iteration": loop_index, "feature_set": feature_set_name, "best_model": loop_best["name"], "review": review, "actions": feature_actions})
+                record("ai_model_review", loop_reviews[-1])
+                if best is None or loop_best["comparison"]["penalized_score"] > best["comparison"]["penalized_score"]:
+                    best = loop_best
+                if not review["needs_improvement"]:
+                    break
+
+        if best is None:
+            raise ValueError("No model candidates could be trained.")
+        model = best["model"]
+        pred = best["pred"]
+        X = best["X"]
+        X_train = best["X_train"]
+        X_test = best["X_test"]
+        y_test = best["y_test"]
+        metrics = best["comparison"]["metrics"]
+        predictions_rows = pd.DataFrame({"actual": y_test.reset_index(drop=True), "prediction": pred}).head(100).to_dict(orient="records")
+        confusion_payload = {"status": "not_classification"}
+        if is_classification:
+            labels = sorted(pd.Series(y_test).dropna().astype(str).unique().tolist())
+            matrix = confusion_matrix(pd.Series(y_test).astype(str), pd.Series(pred).astype(str), labels=labels)
+            confusion_df = pd.DataFrame(matrix, index=[f"actual_{label}" for label in labels], columns=[f"pred_{label}" for label in labels])
+            confusion_df.to_csv(OUTPUT_DIR / "confusion_matrix.csv")
+            confusion_payload = {"status": "success", "labels": labels, "matrix": matrix.tolist()}
+            (OUTPUT_DIR / "confusion_matrix.json").write_text(json.dumps(confusion_payload, indent=2, default=json_default))
+        if hasattr(model, "feature_importances_"):
+            raw_importances = model.feature_importances_
+        elif hasattr(model, "coef_"):
+            raw_importances = np.abs(np.ravel(model.coef_))
+        else:
+            raw_importances = np.zeros(X.shape[1])
+        importances = sorted(zip([str(c) for c in X.columns], raw_importances), key=lambda item: item[1], reverse=True)[:12]
+        try:
+            import joblib
+            joblib.dump(model, OUTPUT_DIR / "best_model.joblib")
+        except Exception as exc:
+            record("model_save_error", {"error": str(exc)})
+        model_result = {
+            "status": "success",
+            "target": str(target),
+            "task_type": "classification" if is_classification else "regression",
+            "model": best["name"],
+            "feature_set": best["comparison"].get("feature_set"),
+            "loop_iteration": best["comparison"].get("loop_iteration"),
+            "rows_train": int(len(X_train)),
+            "rows_test": int(len(X_test)),
+            "metrics": metrics,
+            "overfit_gap": best["comparison"]["overfit_gap"],
+            "ai_review": loop_reviews[-1]["review"] if loop_reviews else {"needs_improvement": False, "reason": "single-pass model review completed"},
+            "feature_loop": loop_reviews,
+            "model_comparison": comparisons,
+            "confusion_matrix": confusion_payload,
+            "feature_importance": [{"feature": name, "importance": float(score)} for name, score in importances],
+            "predictions_preview": predictions_rows[:20],
+            "pca": pca_result,
+        }
+        (OUTPUT_DIR / "model_comparison.json").write_text(json.dumps(comparisons, indent=2, default=json_default))
+        record("train_evaluate_model", model_result)
+    except Exception as exc:
+        model_result = {"status": "failed", "target": str(target), "error": str(exc)}
+        record("model_error", model_result)
+elif TASK["wants_model"]:
+    model_result = {"status": "failed", "error": "Need at least 5 rows and a target column to train a Random Forest model.", "target": str(target)}
+    record("model_error", model_result)
+
+cleaned_path = OUTPUT_DIR / "cleaned.parquet"
+df.to_parquet(cleaned_path, index=False)
+df.to_csv(OUTPUT_DIR / "cleaned.csv", index=False)
+feature_frame.to_csv(OUTPUT_DIR / "features.csv", index=False)
+prepared_features.to_csv(OUTPUT_DIR / "prepared_features.csv", index=False)
+if predictions_rows:
+    pd.DataFrame(predictions_rows).to_csv(OUTPUT_DIR / "predictions.csv", index=False)
+plot_files = []
+plot_errors = []
+if TASK.get("wants_plots"):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        try:
+            import seaborn as sns
+            sns.set_theme(style="whitegrid")
+        except Exception:
+            sns = None
+
+        numeric_plot_columns = list(df.select_dtypes(include=[np.number]).columns[:8])
+        if numeric_plot_columns:
+            axes = df[numeric_plot_columns].hist(figsize=(10, 7), bins=24, color="#6c8cff")
+            for axis in np.ravel(axes):
+                axis.tick_params(labelsize=7)
+            plt.suptitle("Numeric histograms")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "histograms.png", dpi=150)
+            plt.close()
+            plot_files.append("histograms.png")
+        categorical_plot_columns = list(df.select_dtypes(include=["object", "string", "category"]).columns)
+        low_cardinality_columns = [
+            column for column in df.columns
+            if 1 < df[column].nunique(dropna=True) <= 12
+        ]
+        pie_column = categorical_plot_columns[0] if categorical_plot_columns else (low_cardinality_columns[-1] if low_cardinality_columns else None)
+        if pie_column is not None:
+            counts = df[pie_column].astype(str).value_counts().head(8)
+            pie_title = f"Category share: {pie_column}"
+        elif numeric_plot_columns:
+            pie_column = numeric_plot_columns[0]
+            binned = pd.qcut(pd.to_numeric(df[pie_column], errors="coerce"), q=4, duplicates="drop")
+            counts = binned.astype(str).value_counts().head(8)
+            pie_title = f"Quartile share: {pie_column}"
+        else:
+            counts = pd.Series(dtype=int)
+            pie_title = "Category share"
+        if len(counts) > 1:
+            plt.figure(figsize=(6, 6))
+            plt.pie(counts.values, labels=counts.index.astype(str), autopct="%1.1f%%", startangle=90)
+            plt.title(pie_title)
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "pie_chart.png", dpi=150)
+            plt.close()
+            plot_files.append("pie_chart.png")
+        if len(numeric_plot_columns) >= 2:
+            x_column, y_column = numeric_plot_columns[0], numeric_plot_columns[1]
+            plt.figure(figsize=(7, 5))
+            if sns is not None:
+                sns.scatterplot(data=df, x=x_column, y=y_column, hue=categorical_plot_columns[0] if categorical_plot_columns else None, s=34)
+            else:
+                plt.scatter(df[x_column], df[y_column], s=24, alpha=0.75, color="#6c8cff")
+            plt.title(f"Scatter: {x_column} vs {y_column}")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "scatter_plot.png", dpi=150)
+            plt.close()
+            plot_files.append("scatter_plot.png")
+            plt.figure(figsize=(9, 5))
+            if sns is not None:
+                melted = df[numeric_plot_columns[:6]].melt(var_name="feature", value_name="value")
+                sns.boxplot(data=melted, x="feature", y="value")
+                plt.xticks(rotation=35, ha="right")
+            else:
+                plt.boxplot([pd.to_numeric(df[column], errors="coerce").dropna() for column in numeric_plot_columns[:6]], labels=numeric_plot_columns[:6])
+                plt.xticks(rotation=35, ha="right")
+            plt.title("Numeric box plots")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "box_plot.png", dpi=150)
+            plt.close()
+            plot_files.append("box_plot.png")
+        if len(numeric_plot_columns) >= 2:
+            corr = df[numeric_plot_columns].corr(numeric_only=True)
+            plt.figure(figsize=(8, 6))
+            if sns is not None:
+                sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", center=0)
+            else:
+                plt.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
+                plt.colorbar()
+                plt.xticks(range(len(corr.columns)), corr.columns, rotation=45, ha="right")
+                plt.yticks(range(len(corr.index)), corr.index)
+            plt.title("Correlation heatmap")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "correlation_heatmap.png", dpi=150)
+            plt.close()
+            plot_files.append("correlation_heatmap.png")
+        if len(numeric_plot_columns) >= 2:
+            sample_df = df[numeric_plot_columns[:5]].sample(min(len(df), 300), random_state=42) if len(df) > 300 else df[numeric_plot_columns[:5]]
+            if sns is not None:
+                pair_grid = sns.pairplot(sample_df)
+                pair_grid.fig.suptitle("Pair plot", y=1.02)
+                pair_grid.savefig(OUTPUT_DIR / "pair_plot.png", dpi=150)
+                plt.close(pair_grid.fig)
+            else:
+                from pandas.plotting import scatter_matrix
+                axes = scatter_matrix(sample_df, figsize=(9, 9), diagonal="hist", color="#6c8cff", alpha=0.7)
+                for axis in np.ravel(axes):
+                    axis.tick_params(labelsize=6)
+                plt.suptitle("Pair plot")
+                plt.tight_layout()
+                plt.savefig(OUTPUT_DIR / "pair_plot.png", dpi=150)
+                plt.close()
+            plot_files.append("pair_plot.png")
+        missing_counts = pd.Series(before_nulls).sort_values(ascending=False)
+        plt.figure(figsize=(8, 4))
+        missing_counts.head(30).plot(kind="bar", color="#d4a35f")
+        plt.ylabel("missing cells")
+        plt.title("Missingness before cleaning")
+        plt.xticks(rotation=45, ha="right")
+        plt.tight_layout()
+        plt.savefig(OUTPUT_DIR / "missingness.png", dpi=150)
+        plt.close()
+        plot_files.append("missingness.png")
+
+        if model_result.get("status") == "success" and model_result.get("model_comparison"):
+            comparison_df = pd.DataFrame(model_result["model_comparison"])
+            plt.figure(figsize=(7, 4))
+            plt.bar(comparison_df["name"], comparison_df["test_score"], color="#6c8cff")
+            plt.ylabel("test score")
+            plt.title("Model comparison")
+            plt.xticks(rotation=20, ha="right")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "model_comparison.png", dpi=150)
+            plt.close()
+            plot_files.append("model_comparison.png")
+        if model_result.get("status") == "success" and model_result.get("feature_importance"):
+            importance_df = pd.DataFrame(model_result["feature_importance"]).head(12)
+            plt.figure(figsize=(7, 4))
+            plt.barh(importance_df["feature"][::-1], importance_df["importance"][::-1], color="#6faf83")
+            plt.title("Feature importance")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "feature_importance.png", dpi=150)
+            plt.close()
+            plot_files.append("feature_importance.png")
+        confusion_payload = model_result.get("confusion_matrix", {})
+        if confusion_payload.get("status") == "success":
+            matrix = np.array(confusion_payload.get("matrix", []))
+            labels = confusion_payload.get("labels", [])
+            plt.figure(figsize=(6, 5))
+            if sns is not None:
+                sns.heatmap(matrix, annot=True, fmt="d", cmap="Blues", xticklabels=labels, yticklabels=labels)
+            else:
+                plt.imshow(matrix, cmap="Blues")
+                for row in range(matrix.shape[0]):
+                    for col in range(matrix.shape[1]):
+                        plt.text(col, row, str(int(matrix[row, col])), ha="center", va="center")
+                plt.xticks(range(len(labels)), labels, rotation=45, ha="right")
+                plt.yticks(range(len(labels)), labels)
+            plt.xlabel("Predicted")
+            plt.ylabel("Actual")
+            plt.title("Confusion matrix")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "confusion_matrix.png", dpi=150)
+            plt.close()
+            plot_files.append("confusion_matrix.png")
+        if pca_result.get("status") == "success":
+            plt.figure(figsize=(7, 4))
+            values = pca_result.get("explained_variance_ratio", [])
+            plt.plot(range(1, len(values) + 1), np.cumsum(values), marker="o", color="#d4a35f")
+            plt.ylim(0, 1.05)
+            plt.xlabel("components")
+            plt.ylabel("cumulative explained variance")
+            plt.title("PCA variance review")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "pca_variance.png", dpi=150)
+            plt.close()
+            plot_files.append("pca_variance.png")
+        if predictions_rows:
+            preview_df = pd.DataFrame(predictions_rows).head(40)
+            plt.figure(figsize=(7, 4))
+            plt.plot(preview_df.index, preview_df["actual"].astype(str), label="actual", marker="o", linewidth=1)
+            plt.plot(preview_df.index, preview_df["prediction"].astype(str), label="prediction", marker="x", linewidth=1)
+            plt.legend()
+            plt.title("Prediction review")
+            plt.tight_layout()
+            plt.savefig(OUTPUT_DIR / "prediction_review.png", dpi=150)
+            plt.close()
+            plot_files.append("prediction_review.png")
+    except Exception as exc:
+        plot_errors.append(str(exc))
+        record("plot_error", {"error": str(exc)})
+required_plot_files = TASK.get("required_plot_files", [])
+missing_required_plots = [file for file in required_plot_files if not (OUTPUT_DIR / file).exists()]
+if missing_required_plots:
+    record("required_plot_error", {"missing_files": missing_required_plots, "plot_errors": plot_errors})
+if TASK["wants_model"]:
+    accuracy_report = {
+        "status": model_result.get("status"),
+        "target": model_result.get("target"),
+        "model": model_result.get("model"),
+        "feature_set": model_result.get("feature_set"),
+        "loop_iteration": model_result.get("loop_iteration"),
+        "rows_train": model_result.get("rows_train"),
+        "rows_test": model_result.get("rows_test"),
+        "metrics": model_result.get("metrics", {}),
+        "overfit_gap": model_result.get("overfit_gap"),
+        "ai_review": model_result.get("ai_review", {}),
+        "feature_loop": model_result.get("feature_loop", []),
+        "model_comparison": model_result.get("model_comparison", []),
+        "confusion_matrix": model_result.get("confusion_matrix", {}),
+        "pca": pca_result,
+        "plots": plot_files,
+        "message": "Classification accuracy is reported when the target is categorical. Regression tasks report r2 and mae.",
+    }
+    (OUTPUT_DIR / "model_accuracy_report.json").write_text(json.dumps(accuracy_report, indent=2, default=json_default))
+
+after_nulls = df.isna().sum().to_dict()
+validation = {
+    "status": "passed" if cleaned_path.exists() and not missing_required_plots else "failed",
+    "workflow": TASK["workflow"],
+    "checks": [
+        {"name": "local_dataset_loaded", "passed": original_shape[0] >= 0},
+        {"name": "cleaned_dataset_written", "passed": cleaned_path.exists()},
+        {"name": "columns_available", "passed": df.shape[1] > 0},
+        {"name": "required_plots_written", "passed": not missing_required_plots, "missing_files": missing_required_plots},
+    ],
+    "metrics": {
+        "nulls_before": {str(k): int(v) for k, v in before_nulls.items()},
+        "nulls_after": {str(k): int(v) for k, v in after_nulls.items()},
+        "duplicates_before": before_duplicates,
+        "duplicates_after": int(df.duplicated().sum()),
+        "transformed_values": int(sum(max(0, before_nulls.get(k, 0) - after_nulls.get(k, 0)) for k in before_nulls)),
+    },
+    "model": model_result,
+    "pca": pca_result,
+    "plots": plot_files,
+    "plot_errors": plot_errors,
+    "missing_required_plots": missing_required_plots,
+}
+manifest = {
+    "instruction": TASK["instruction"],
+    "workflow": TASK["workflow"],
+    "local_input_path": str(INPUT_PATH),
+    "outputs": ["cleaned.parquet", "cleaned.csv", "features.csv", "prepared_features.csv", "data_profile_summary.json", "validation_report.json", "execution_summary.json"] + (["split_summary.json"] if TASK["wants_model"] else []) + (["pca_features.csv", "pca_variance.json"] if pca_result.get("status") == "success" else []) + (["model_accuracy_report.json", "model_comparison.json", "best_model.joblib"] if TASK["wants_model"] else []) + (["confusion_matrix.csv", "confusion_matrix.json"] if model_result.get("confusion_matrix", {}).get("status") == "success" else []) + plot_files,
+    "steps": steps,
+}
+summary = {
+    "status": validation["status"],
+    "dataset_shape_before": [int(original_shape[0]), int(original_shape[1])],
+    "dataset_shape_after": [int(df.shape[0]), int(df.shape[1])],
+    "model": model_result,
+    "pca": pca_result,
+    "plots": plot_files,
+    "generated_at": datetime.utcnow().isoformat() + "Z",
+}
+(OUTPUT_DIR / "cleaning_manifest.json").write_text(json.dumps(manifest, indent=2, default=json_default))
+(OUTPUT_DIR / "validation_report.json").write_text(json.dumps(validation, indent=2, default=json_default))
+(OUTPUT_DIR / "execution_summary.json").write_text(json.dumps(summary, indent=2, default=json_default))

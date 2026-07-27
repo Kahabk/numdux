@@ -1,5 +1,5 @@
 import { Bot, CheckCircle2, ChevronDown, ChevronUp, CircleAlert, Clock3, Copy, Download, FilePlus2, FileText, MoreHorizontal, Play, Wrench } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import type React from "react";
 import { cn } from "../lib/utils";
 
@@ -26,7 +26,7 @@ type CellProps = {
   onToggleCollapsed?: () => void;
 };
 
-export function Cell({ type, title, status = "idle", duration, children, output, onRun, sandbox, selected, onSelect, onDuplicate, onAddBelow, onAskAI, onExplain, onExport, includeInReport, onToggleReport, collapsed: controlledCollapsed, defaultCollapsed = false, onToggleCollapsed }: CellProps) {
+export const Cell = memo(function Cell({ type, title, status = "idle", duration, children, output, onRun, sandbox, selected, onSelect, onDuplicate, onAddBelow, onAskAI, onExplain, onExport, includeInReport, onToggleReport, collapsed: controlledCollapsed, defaultCollapsed = false, onToggleCollapsed }: CellProps) {
   const [localCollapsed, setLocalCollapsed] = useState(defaultCollapsed);
   const collapsed = controlledCollapsed ?? localCollapsed;
   const toggleCollapsed = () => {
@@ -79,4 +79,4 @@ export function Cell({ type, title, status = "idle", duration, children, output,
       {output && <div className="bg-base/40 px-4 py-3">{output}</div>}</>}
     </section>
   );
-}
+});

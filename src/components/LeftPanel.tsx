@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Database, FileArchive, FileText, Folder, GitBranch, RefreshCw, ScrollText, Settings, Trash2 } from "lucide-react";
 import type React from "react";
 import type { DatasetRecord, DatasetVersion } from "../lib/types";
@@ -5,7 +6,7 @@ import { cn } from "../lib/utils";
 
 const logoSrc = new URL("../../numdux_logo.png", import.meta.url).href;
 
-export function LeftPanel({
+export const LeftPanel = memo(function LeftPanel({
   datasets,
   filename,
   isRefreshing,
@@ -109,7 +110,7 @@ export function LeftPanel({
       </nav>
     </aside>
   );
-}
+});
 
 function Group({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { BrainCircuit, Filter, Play, RefreshCw, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { listModelRuns, trainModel } from "../lib/api";
 import type { ModelRunRecord, ModelTaskType, ModelType, UploadResponse } from "../lib/types";
 import { GraphPreview } from "./GraphStudio";
@@ -8,7 +8,7 @@ import { GraphPreview } from "./GraphStudio";
 const TASK_TYPES: ModelTaskType[] = ["auto", "classification", "regression"];
 const MODEL_TYPES: ModelType[] = ["random_forest", "gradient_boosting", "logistic_regression", "linear_regression"];
 
-export function ModelLab({ dataset }: { dataset: UploadResponse }) {
+export const ModelLab = memo(function ModelLab({ dataset }: { dataset: UploadResponse }) {
   const columns = dataset.profile.column_metadata.map((column) => column.name);
   const headVersionId = dataset.profile.version_id;
   const [target, setTarget] = useState(columns[columns.length - 1] ?? "");
@@ -102,7 +102,7 @@ export function ModelLab({ dataset }: { dataset: UploadResponse }) {
       {selectedRun && <ModelRunDetail run={selectedRun} />}
     </div>
   );
-}
+});
 
 function ModelRunDetail({ run }: { run: ModelRunRecord }) {
   const importanceData = { columns: ["feature", "importance"], data: run.feature_importances.map((item) => ({ feature: item.feature, importance: item.importance })) };

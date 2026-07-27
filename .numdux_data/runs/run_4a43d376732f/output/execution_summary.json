@@ -1,0 +1,262 @@
+{
+  "status": "passed",
+  "dataset_shape_before": [
+    2823,
+    25
+  ],
+  "dataset_shape_after": [
+    2823,
+    25
+  ],
+  "model": {
+    "status": "success",
+    "target": "SALES",
+    "task_type": "regression",
+    "model": "random_forest",
+    "feature_set": "baseline_features",
+    "loop_iteration": 1,
+    "rows_train": 2258,
+    "rows_test": 565,
+    "metrics": {
+      "r2": 0.9365524482394685,
+      "mae": 251.13299018685336
+    },
+    "overfit_gap": 0.033813287517838075,
+    "ai_review": {
+      "needs_improvement": false,
+      "reason": "regression score is strong and overfit gap is controlled",
+      "score": 0.9365524482394685,
+      "overfit_gap": 0.033813287517838075
+    },
+    "feature_loop": [
+      {
+        "iteration": 1,
+        "feature_set": "baseline_features",
+        "best_model": "random_forest",
+        "review": {
+          "needs_improvement": false,
+          "reason": "regression score is strong and overfit gap is controlled",
+          "score": 0.9365524482394685,
+          "overfit_gap": 0.033813287517838075
+        },
+        "actions": [
+          "use the prepared feature table"
+        ]
+      }
+    ],
+    "model_comparison": [
+      {
+        "name": "linear_regression",
+        "feature_set": "baseline_features",
+        "loop_iteration": 1,
+        "feature_count": 8,
+        "train_score": 0.8272438851611791,
+        "test_score": 0.8185833748545868,
+        "overfit_gap": 0.008660510306592317,
+        "penalized_score": 0.8185833748545868,
+        "metrics": {
+          "r2": 0.8185833748545868,
+          "mae": 573.188021296393
+        },
+        "best_params": {}
+      },
+      {
+        "name": "random_forest",
+        "feature_set": "baseline_features",
+        "loop_iteration": 1,
+        "feature_count": 8,
+        "train_score": 0.9703657357573066,
+        "test_score": 0.9365524482394685,
+        "overfit_gap": 0.033813287517838075,
+        "penalized_score": 0.9365524482394685,
+        "metrics": {
+          "r2": 0.9365524482394685,
+          "mae": 251.13299018685336
+        },
+        "best_params": {
+          "max_depth": null,
+          "min_samples_leaf": 3,
+          "n_estimators": 140
+        }
+      },
+      {
+        "name": "gradient_boosting",
+        "feature_set": "baseline_features",
+        "loop_iteration": 1,
+        "feature_count": 8,
+        "train_score": 0.9445913545184496,
+        "test_score": 0.9318548983391446,
+        "overfit_gap": 0.012736456179304967,
+        "penalized_score": 0.9318548983391446,
+        "metrics": {
+          "r2": 0.9318548983391446,
+          "mae": 272.263179503965
+        },
+        "best_params": {
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "n_estimators": 80
+        }
+      }
+    ],
+    "confusion_matrix": {
+      "status": "not_classification"
+    },
+    "feature_importance": [
+      {
+        "feature": "PRICEEACH",
+        "importance": 0.5455967585213319
+      },
+      {
+        "feature": "QUANTITYORDERED",
+        "importance": 0.3333112817354181
+      },
+      {
+        "feature": "MSRP",
+        "importance": 0.09226534545194516
+      },
+      {
+        "feature": "ORDERNUMBER",
+        "importance": 0.014024419289504765
+      },
+      {
+        "feature": "ORDERLINENUMBER",
+        "importance": 0.007324299551493055
+      },
+      {
+        "feature": "MONTH_ID",
+        "importance": 0.005496106639328946
+      },
+      {
+        "feature": "QTR_ID",
+        "importance": 0.0012738616107814491
+      },
+      {
+        "feature": "YEAR_ID",
+        "importance": 0.0007079272001966782
+      }
+    ],
+    "predictions_preview": [
+      {
+        "actual": 1536.57,
+        "prediction": 1519.671623469387
+      },
+      {
+        "actual": 2168.5,
+        "prediction": 2180.8018290326745
+      },
+      {
+        "actual": 4351.23,
+        "prediction": 4637.850620977633
+      },
+      {
+        "actual": 3880.2,
+        "prediction": 3501.776285904969
+      },
+      {
+        "actual": 3042.68,
+        "prediction": 3040.021553148438
+      },
+      {
+        "actual": 7964.855,
+        "prediction": 6866.717070140179
+      },
+      {
+        "actual": 7827.3,
+        "prediction": 5683.631162126368
+      },
+      {
+        "actual": 1672.1,
+        "prediction": 1662.3832553803334
+      },
+      {
+        "actual": 2328.66,
+        "prediction": 2268.412260539063
+      },
+      {
+        "actual": 7964.855,
+        "prediction": 7586.6206661848055
+      },
+      {
+        "actual": 2574.18,
+        "prediction": 2585.6636340909095
+      },
+      {
+        "actual": 2151.82,
+        "prediction": 2168.0676308415796
+      },
+      {
+        "actual": 703.6,
+        "prediction": 736.901342857143
+      },
+      {
+        "actual": 4468.4,
+        "prediction": 4775.219714802856
+      },
+      {
+        "actual": 5566.0,
+        "prediction": 5570.4117054138305
+      },
+      {
+        "actual": 6934.62,
+        "prediction": 5749.557542708081
+      },
+      {
+        "actual": 1611.36,
+        "prediction": 1598.35583496444
+      },
+      {
+        "actual": 5704.32,
+        "prediction": 5822.088828928316
+      },
+      {
+        "actual": 2280.24,
+        "prediction": 2296.5426455758534
+      },
+      {
+        "actual": 972.4,
+        "prediction": 991.7311932101627
+      }
+    ],
+    "pca": {
+      "status": "success",
+      "input_features": 8,
+      "kept_components": 5,
+      "explained_variance_ratio": [
+        0.30854021354818595,
+        0.2091842437490933,
+        0.1891278516776608,
+        0.12512486441513482,
+        0.12266797479113317
+      ],
+      "cumulative_variance": 0.9546451481812079
+    }
+  },
+  "pca": {
+    "status": "success",
+    "input_features": 8,
+    "kept_components": 5,
+    "explained_variance_ratio": [
+      0.30854021354818595,
+      0.2091842437490933,
+      0.1891278516776608,
+      0.12512486441513482,
+      0.12266797479113317
+    ],
+    "cumulative_variance": 0.9546451481812079
+  },
+  "plots": [
+    "histograms.png",
+    "pie_chart.png",
+    "scatter_plot.png",
+    "box_plot.png",
+    "correlation_heatmap.png",
+    "pair_plot.png",
+    "missingness.png",
+    "model_comparison.png",
+    "feature_importance.png",
+    "pca_variance.png",
+    "prediction_review.png"
+  ],
+  "generated_at": "2026-07-27T14:37:42.123432Z"
+}

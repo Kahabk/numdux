@@ -316,7 +316,13 @@ class RuleBasedAIProvider(AIProvider):
             elif INPUT_PATH.suffix in {".json", ".jsonl"}:
                 df = pd.read_json(INPUT_PATH, lines=INPUT_PATH.suffix == ".jsonl")
             else:
-                df = pd.read_csv(INPUT_PATH, low_memory=False)
+                try:
+                    df = pd.read_csv(INPUT_PATH, low_memory=False)
+                except Exception:
+                    try:
+                        df = pd.read_csv(INPUT_PATH, low_memory=False, encoding="latin1")
+                    except Exception:
+                        df = pd.read_csv(INPUT_PATH, low_memory=False, encoding="utf-8", errors="replace")
 
             rows_before, columns_before = df.shape
             before_nulls = df.isna().sum().to_dict()

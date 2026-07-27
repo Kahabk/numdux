@@ -1,5 +1,5 @@
+import { memo, useEffect, useState } from "react";
 import { Bot, CircleAlert, Code2, Database, Play, Sparkles, Trash2, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
 import type React from "react";
 import type { CleaningRun, DatasetProfile } from "../lib/types";
 
@@ -9,7 +9,7 @@ const QUICK_PROMPTS = [
   "Validate the cleaned output and warn me about destructive transformations."
 ];
 
-export function RightPanel({
+export const RightPanel = memo(function RightPanel({
   profile,
   run,
   instruction,
@@ -172,7 +172,7 @@ export function RightPanel({
       </div>
     </aside>
   );
-}
+});
 
 function PanelTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (

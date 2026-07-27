@@ -2,7 +2,7 @@ import Editor from "@monaco-editor/react";
 import { useMutation, useQuery, type UseMutationResult } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { BarChart3, BrainCircuit, CheckCircle2, Database, Download, FileCode2, FileText, FileUp, Filter, Gauge, GitBranch, KeyRound, Layers3, Menu, Moon, RefreshCw, Save, Search, Send, Settings, ShieldCheck, SlidersHorizontal, Sparkles, Sun, TestTube2, WandSparkles, XCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type React from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { approveRun, approveSandboxTask, createAnalysisPlan, deleteAllStorage, deleteDataset, getAIProviderStatus, getAppSettings, getDatasetReport, getDatasetVersion, getHealth, listDatasets, runCleaning, runCustomCode, runSandboxTask, runSql, updateAppSettings, uploadDataset } from "./lib/api";
@@ -126,6 +126,17 @@ const AUTO_AGENT_BLUEPRINT: Array<{ id: string; title: string; prompt: string; p
 const EDA_PLOT_FILES = ["histograms.png", "pie_chart.png", "scatter_plot.png", "box_plot.png", "correlation_heatmap.png", "pair_plot.png", "missingness.png"];
 const MODEL_PLOT_FILES = ["model_comparison.png", "feature_importance.png", "confusion_matrix.png", "pca_variance.png", "prediction_review.png"];
 
+const MONACO_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 12,
+  lineNumbersMinChars: 3,
+  scrollBeyondLastLine: false,
+  wordWrap: "on" as const,
+  padding: { top: 12 },
+  automaticLayout: true,
+  folding: false
+};
+
 export function App() {
   const { dataset, datasets, run, versions, instruction, setDatasets, setDataset, setInstruction, setRun, addVersion, removeDataset, resetWorkspace } = useNotebookStore();
   const [code, setCode] = useState("");
@@ -152,13 +163,13 @@ export function App() {
   const [autoAgentStatus, setAutoAgentStatus] = useState<"idle" | "running" | "success" | "failed">("idle");
   const compact = useCompactLayout();
   const savedDatasets = useQuery({ queryKey: ["datasets"], queryFn: listDatasets });
-  const health = useQuery({ queryKey: ["health"], queryFn: getHealth, refetchInterval: 10000 });
+  const health = useQuery({ queryKey: ["health"], queryFn: getHealth, refetchInterval: 60000 });
   const provider = useQuery({ queryKey: ["ai-provider"], queryFn: getAIProviderStatus, refetchInterval: 300000 });
   const settings = useQuery({ queryKey: ["settings"], queryFn: getAppSettings });
   const report = useQuery({
     queryKey: ["report", dataset?.dataset_id, dataset?.profile.version_id, run?.run_id, reportTheme],
     queryFn: () => getDatasetReport(dataset!.dataset_id, run?.run_id, dataset!.profile.version_id, reportTheme),
-    enabled: Boolean(dataset)
+    enabled: Boolean(dataset) && reportPreview
   });
 
   useEffect(() => {
@@ -605,7 +616,7 @@ type NotebookProps = {
   onRestartSandbox: () => void;
 };
 
-function Notebook(props: NotebookProps) {
+const Notebook = memo(function Notebook(props: NotebookProps) {
   const { dataset, instruction, upload, healthStatus, providerStatus, isRefreshing, agentPending, sandboxes, taskResults, taskError, approveTaskPendingId, approveTaskError, activeSandboxId, manualCells, selectedCellId, appTheme, uploadInputRef, workflowMemory, autoAgentSteps, autoAgentStatus } = props;
   const autoPending = autoAgentStatus === "running";
   const activeSandbox = sandboxes.find((sandbox) => sandbox.id === activeSandboxId);
@@ -657,7 +668,7 @@ function Notebook(props: NotebookProps) {
       </div>
     </main>
   );
-}
+});
 
 function SimpleWorkflowGuide({
   dataset,
@@ -991,7 +1002,7 @@ function PipelineStepper({
               <StatusBadge status={status} />
               <button className="command-button text-muted" disabled={!command || sandboxPending} onClick={() => onRunSandboxTask(command)} type="button"><RefreshCw className="h-3.5 w-3.5" />Re-run</button>
             </div>
-            {code ? <Editor height="300px" defaultLanguage="python" value={displayCode} onChange={(value) => onCodeChange(value ?? "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 12, lineNumbersMinChars: 3, scrollBeyondLastLine: false, wordWrap: "on", padding: { top: 12 } }} /> : <div className="pipeline-empty">Generated code appears here after the sandbox run starts.</div>}
+            {code ? <Editor height="300px" defaultLanguage="python" value={displayCode} onChange={(value) => onCodeChange(value ?? "")} theme="vs-dark" options={MONACO_EDITOR_OPTIONS} /> : <div className="pipeline-empty">Generated code appears here after the sandbox run starts.</div>}
             <div className="flex flex-wrap items-center gap-2">
               <button className="command-button text-muted" disabled={!code.trim() || codePending} onClick={onRunCode} type="button"><FileCode2 className="h-3.5 w-3.5" />{codePending ? "Running edited code..." : "Run edited code"}</button>
               {generatedFiles.map((file) => <span key={file} className="pipeline-chip">{file}</span>)}
@@ -1564,7 +1575,7 @@ function TaskResultCell({
             <span className="text-muted">Sandbox code</span>
             <span className="font-mono text-muted">{task.generated_code.engine}</span>
           </div>
-          <Editor height="320px" defaultLanguage="python" value={draftCode} onChange={(value) => setDraftCode(value ?? "")} theme="vs-dark" options={{ minimap: { enabled: false }, fontSize: 12, lineNumbersMinChars: 3, scrollBeyondLastLine: false, wordWrap: "on", padding: { top: 12 } }} />
+          <Editor height="320px" defaultLanguage="python" value={draftCode} onChange={(value) => setDraftCode(value ?? "")} theme="vs-dark" options={MONACO_EDITOR_OPTIONS} />
         </div>
       </details>
     </Cell>

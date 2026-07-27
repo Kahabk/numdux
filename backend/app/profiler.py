@@ -27,7 +27,19 @@ def load_dataset(content: bytes, filename: str) -> pd.DataFrame:
     if suffix in {".json", ".jsonl"}:
         return pd.read_json(buffer, lines=suffix == ".jsonl")
     sep = "\t" if suffix == ".tsv" else ","
-    return pd.read_csv(buffer, sep=sep, low_memory=False)
+    try:
+        return pd.read_csv(buffer, sep=sep, low_memory=False)
+    except (UnicodeDecodeError, Exception):
+        buffer.seek(0)
+        try:
+            return pd.read_csv(buffer, sep=sep, low_memory=False, encoding="latin1")
+        except Exception:
+            buffer.seek(0)
+            try:
+                return pd.read_csv(buffer, sep=sep, low_memory=False, encoding="cp1252")
+            except Exception:
+                buffer.seek(0)
+                return pd.read_csv(buffer, sep=sep, low_memory=False, encoding="utf-8", errors="replace")
 
 
 def dataframe_fingerprint(df: pd.DataFrame) -> str:

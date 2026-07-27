@@ -1,9 +1,0 @@
-{
-  "target": "Date",
-  "task_type": "classification",
-  "rows_total": 6435,
-  "rows_train": 5148,
-  "rows_test": 1287,
-  "feature_count": 7,
-  "stratified": false
-}

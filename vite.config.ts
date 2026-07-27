@@ -7,7 +7,19 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: "backend/app/dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          monaco: ["@monaco-editor/react"],
+          recharts: ["recharts"],
+          table: ["@tanstack/react-table"],
+          query: ["@tanstack/react-query"],
+          icons: ["lucide-react"]
+        }
+      }
+    }
   },
   server: {
     port: 5173,

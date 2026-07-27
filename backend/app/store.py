@@ -148,8 +148,8 @@ class InMemoryStore:
         path = dataset_dir / "dataset_manifest.json"
         if not path.exists():
             return {}
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8", errors="replace"))
 
     @staticmethod
     def _write_manifest(dataset_dir: Path, data: dict) -> None:
-        (dataset_dir / "dataset_manifest.json").write_text(json.dumps(data, indent=2))
+        (dataset_dir / "dataset_manifest.json").write_text(json.dumps(data, indent=2), encoding="utf-8")

@@ -113,9 +113,17 @@ def generate_task_code(instruction: str, metadata: dict[str, Any]) -> GeneratedC
                 return pd.read_json(path, lines=True)
             if suffix == ".json":
                 return pd.read_json(path)
-            if suffix == ".tsv":
-                return pd.read_csv(path, sep="\\t", low_memory=False)
-            return pd.read_csv(path, low_memory=False)
+            sep = "\\t" if suffix == ".tsv" else ","
+            try:
+                return pd.read_csv(path, sep=sep, low_memory=False)
+            except Exception:
+                try:
+                    return pd.read_csv(path, sep=sep, low_memory=False, encoding="latin1")
+                except Exception:
+                    try:
+                        return pd.read_csv(path, sep=sep, low_memory=False, encoding="cp1252")
+                    except Exception:
+                        return pd.read_csv(path, sep=sep, low_memory=False, encoding="utf-8", errors="replace")
 
         def json_default(value):
             if isinstance(value, (np.integer,)):
