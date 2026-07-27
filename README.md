@@ -280,7 +280,7 @@ The frontend calls backend routes under `/api`. Common endpoints include:
 - Shared frontend API helpers live in `src/lib/api.ts`.
 - Pydantic request and response models live in `backend/app/models.py`.
 - The Vite dev server proxies `/api` to `VITE_API_URL`.
-- `./numdux run` starts both services and injects the backend URL into the frontend process.
+- `./numdux` starts both services and injects the backend URL into the frontend process.
 - The backend loads `.env` from the repository root on demand.
 
 Before shipping changes, run:
@@ -299,7 +299,7 @@ python3 -m py_compile backend/app/*.py
 
 Backend is not reachable:
 
-- Start the full app with `./numdux run`.
+- Start the full app with `./numdux`.
 - Confirm the API is available at `http://127.0.0.1:8000/api/health`.
 - If using separate frontend/backend processes, set `VITE_API_URL` to the backend URL.
 

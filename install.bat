@@ -7,20 +7,24 @@ echo.
 REM 1. Check Python (try python, python3, py)
 set PYTHON_CMD=
 where python >nul 2>nul
-if %errorlevel% eq 0 (
+if %errorlevel% equ 0 (
     set PYTHON_CMD=python
-) else (
-    where python3 >nul 2>nul
-    if %errorlevel% eq 0 (
-        set PYTHON_CMD=python3
-    ) else (
-        where py >nul 2>nul
-        if %errorlevel% eq 0 (
-            set PYTHON_CMD=py
-        )
-    )
+    goto python_found
 )
 
+where python3 >nul 2>nul
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=python3
+    goto python_found
+)
+
+where py >nul 2>nul
+if %errorlevel% equ 0 (
+    set PYTHON_CMD=py
+    goto python_found
+)
+
+:python_found
 if "%PYTHON_CMD%"=="" (
     echo [ERROR] Python was not found in your PATH.
     echo Please install Python 3.11+ and check "Add Python to PATH" during installation.
@@ -46,6 +50,10 @@ if not exist ".venv" (
 
 echo [INFO] Activating virtual environment...
 call .venv\Scripts\activate.bat
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to activate virtual environment.
+    goto error
+)
 
 echo [INFO] Upgrading pip...
 python -m pip install --upgrade pip
@@ -57,27 +65,32 @@ if exist "backend\app\dist\index.html" (
 )
 
 where npm >nul 2>nul
-if %errorlevel% eq 0 (
-    echo [INFO] npm found. Installing frontend dependencies and building assets...
-    call npm install
-    if %errorlevel% neq 0 (
-        echo [WARNING] npm install failed. Running without rebuilding frontend.
-    ) else (
-        call npm run build
-        if %errorlevel% neq 0 (
-            echo [WARNING] npm run build failed. Running without rebuilding frontend.
-        ) else (
-            set FRONTEND_BUILT=1
-        )
-    )
-) else (
-    if %FRONTEND_BUILT% eq 1 (
+if %errorlevel% neq 0 (
+    if %FRONTEND_BUILT% equ 1 (
         echo [INFO] npm not found, but pre-built frontend assets were detected. Skipping frontend build.
     ) else (
         echo [WARNING] npm was not found and no pre-built frontend assets exist.
         echo Please install Node.js/npm to build the frontend, then re-run this installer.
     )
+    goto skip_frontend
 )
+
+echo [INFO] npm found. Installing frontend dependencies...
+call npm install
+if %errorlevel% neq 0 (
+    echo [WARNING] npm install failed. Running without rebuilding frontend.
+    goto skip_frontend
+)
+
+echo [INFO] Building frontend assets...
+call npm run build
+if %errorlevel% neq 0 (
+    echo [WARNING] npm run build failed. Running without rebuilding frontend.
+) else (
+    set FRONTEND_BUILT=1
+)
+
+:skip_frontend
 
 REM 4. Install backend dependencies and register the numdux CLI package
 echo [INFO] Installing Python dependencies and registering 'numdux' CLI...
@@ -89,7 +102,7 @@ if %errorlevel% neq 0 (
 
 REM 5. Register numdux globally in User PATH
 echo [INFO] Registering 'numdux' command globally in your User PATH...
-powershell -NoProfile -Command "$dir = '%CD%'; $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); if ($userPath -split ';' -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', $userPath + ';' + $dir, 'User'); Write-Host 'Successfully added Numdux directory to your User PATH.' } else { Write-Host 'Numdux directory is already in your User PATH.' }" >nul 2>nul
+powershell -NoProfile -Command "$dir = [System.IO.Path]::GetFullPath('.'); $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); if ([string]::IsNullOrEmpty($userPath)) { [Environment]::SetEnvironmentVariable('Path', $dir, 'User'); Write-Host 'Successfully added Numdux directory to your User PATH.' } elseif ($userPath -split ';' -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', $userPath + ';' + $dir, 'User'); Write-Host 'Successfully added Numdux directory to your User PATH.' } else { Write-Host 'Numdux directory is already in your User PATH.' }" >nul 2>nul
 if %errorlevel% neq 0 (
     echo [WARNING] Could not automatically add Numdux to PATH. You can run it using '.\numdux' from the root folder.
 ) else (

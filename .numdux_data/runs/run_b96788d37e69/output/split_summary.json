@@ -1,0 +1,11 @@
+{
+  "target": "Date",
+  "task_type": "classification",
+  "rows_total": 6435,
+  "rows_train": 5148,
+  "rows_test": 1287,
+  "feature_count": 7,
+  "feature_set": "baseline_features",
+  "loop_iteration": 1,
+  "stratified": false
+}

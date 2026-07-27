@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "dataset_shape_before": [
+    6435,
+    8
+  ],
+  "dataset_shape_after": [
+    6435,
+    8
+  ],
+  "model": {
+    "status": "not_requested"
+  },
+  "pca": {
+    "status": "not_requested"
+  },
+  "plots": [],
+  "generated_at": "2026-07-25T14:18:48.686985Z"
+}

@@ -1,0 +1,46 @@
+{
+  "rows": 6435,
+  "columns": 8,
+  "column_names": [
+    "Store",
+    "Date",
+    "Weekly_Sales",
+    "Holiday_Flag",
+    "Temperature",
+    "Fuel_Price",
+    "CPI",
+    "Unemployment"
+  ],
+  "numeric_columns": [
+    "Store",
+    "Weekly_Sales",
+    "Holiday_Flag",
+    "Temperature",
+    "Fuel_Price",
+    "CPI",
+    "Unemployment"
+  ],
+  "categorical_columns": [
+    "Date"
+  ],
+  "missing_values": {
+    "Store": 0,
+    "Date": 0,
+    "Weekly_Sales": 0,
+    "Holiday_Flag": 0,
+    "Temperature": 0,
+    "Fuel_Price": 0,
+    "CPI": 0,
+    "Unemployment": 0
+  },
+  "duplicate_rows": 0,
+  "outliers_iqr": {
+    "Store": 0,
+    "Weekly_Sales": 0,
+    "Temperature": 0,
+    "Fuel_Price": 0,
+    "CPI": 0,
+    "Unemployment": 0
+  },
+  "target_hint": "Date"
+}

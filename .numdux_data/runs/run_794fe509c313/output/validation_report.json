@@ -1,0 +1,74 @@
+{
+  "status": "passed",
+  "workflow": [
+    "load_local_dataset",
+    "feature_engineering",
+    "prepare_data",
+    "pca_variance",
+    "validate_outputs"
+  ],
+  "checks": [
+    {
+      "name": "local_dataset_loaded",
+      "passed": true
+    },
+    {
+      "name": "cleaned_dataset_written",
+      "passed": true
+    },
+    {
+      "name": "columns_available",
+      "passed": true
+    },
+    {
+      "name": "required_plots_written",
+      "passed": true,
+      "missing_files": []
+    }
+  ],
+  "metrics": {
+    "nulls_before": {
+      "Store": 0,
+      "Date": 0,
+      "Weekly_Sales": 0,
+      "Holiday_Flag": 0,
+      "Temperature": 0,
+      "Fuel_Price": 0,
+      "CPI": 0,
+      "Unemployment": 0
+    },
+    "nulls_after": {
+      "Store": 0,
+      "Date": 0,
+      "Weekly_Sales": 0,
+      "Holiday_Flag": 0,
+      "Temperature": 0,
+      "Fuel_Price": 0,
+      "CPI": 0,
+      "Unemployment": 0
+    },
+    "duplicates_before": 0,
+    "duplicates_after": 0,
+    "transformed_values": 0
+  },
+  "model": {
+    "status": "not_requested"
+  },
+  "pca": {
+    "status": "success",
+    "input_features": 7,
+    "kept_components": 6,
+    "explained_variance_ratio": [
+      0.22855121163651437,
+      0.18362176988096932,
+      0.16824670734047198,
+      0.1357350794336926,
+      0.12724094077790774,
+      0.08331758689448117
+    ],
+    "cumulative_variance": 0.9267132959640372
+  },
+  "plots": [],
+  "plot_errors": [],
+  "missing_required_plots": []
+}

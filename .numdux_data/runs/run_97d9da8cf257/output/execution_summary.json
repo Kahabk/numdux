@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "dataset_shape_before": [
+    6435,
+    8
+  ],
+  "dataset_shape_after": [
+    6435,
+    8
+  ],
+  "model": {
+    "status": "not_requested"
+  },
+  "pca": {
+    "status": "not_requested"
+  },
+  "plots": [
+    "histograms.png",
+    "pie_chart.png",
+    "scatter_plot.png",
+    "box_plot.png",
+    "correlation_heatmap.png",
+    "pair_plot.png",
+    "missingness.png"
+  ],
+  "generated_at": "2026-07-25T14:18:54.923977Z"
+}

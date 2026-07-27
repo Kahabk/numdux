@@ -1,9 +1,11 @@
 @echo off
 set SCRIPT_DIR=%~dp0
-cd /d "%SCRIPT_DIR%"
+setlocal
+set PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%
 
-if exist ".venv\Scripts\python.exe" (
-    ".venv\Scripts\python.exe" -m backend.app.cli %*
+if exist "%SCRIPT_DIR%.venv\Scripts\python.exe" (
+    "%SCRIPT_DIR%.venv\Scripts\python.exe" -m backend.app.cli %*
 ) else (
     python -m backend.app.cli %*
 )
+endlocal

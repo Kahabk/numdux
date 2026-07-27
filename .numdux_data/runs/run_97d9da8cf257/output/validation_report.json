@@ -1,0 +1,69 @@
+{
+  "status": "passed",
+  "workflow": [
+    "load_local_dataset",
+    "visualize_data",
+    "validate_outputs"
+  ],
+  "checks": [
+    {
+      "name": "local_dataset_loaded",
+      "passed": true
+    },
+    {
+      "name": "cleaned_dataset_written",
+      "passed": true
+    },
+    {
+      "name": "columns_available",
+      "passed": true
+    },
+    {
+      "name": "required_plots_written",
+      "passed": true,
+      "missing_files": []
+    }
+  ],
+  "metrics": {
+    "nulls_before": {
+      "Store": 0,
+      "Date": 0,
+      "Weekly_Sales": 0,
+      "Holiday_Flag": 0,
+      "Temperature": 0,
+      "Fuel_Price": 0,
+      "CPI": 0,
+      "Unemployment": 0
+    },
+    "nulls_after": {
+      "Store": 0,
+      "Date": 0,
+      "Weekly_Sales": 0,
+      "Holiday_Flag": 0,
+      "Temperature": 0,
+      "Fuel_Price": 0,
+      "CPI": 0,
+      "Unemployment": 0
+    },
+    "duplicates_before": 0,
+    "duplicates_after": 0,
+    "transformed_values": 0
+  },
+  "model": {
+    "status": "not_requested"
+  },
+  "pca": {
+    "status": "not_requested"
+  },
+  "plots": [
+    "histograms.png",
+    "pie_chart.png",
+    "scatter_plot.png",
+    "box_plot.png",
+    "correlation_heatmap.png",
+    "pair_plot.png",
+    "missingness.png"
+  ],
+  "plot_errors": [],
+  "missing_required_plots": []
+}
