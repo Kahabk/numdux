@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="NUMDUX.jpg" alt="Numdux banner" width="100%" />
+  <img src="NUMDUX.jpg" alt="Numdux banner" width="10%" />
 </p>
 
 # Numdux Notebook
