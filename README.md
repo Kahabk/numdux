@@ -13,7 +13,7 @@
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776ab" />
 </p>
 
-**Current version:** `0.2.0`
+**Current version:** `0.1.2`
 
 Numdux is a local-first data-quality notebook for profiling datasets, planning cleaning work, running Python or SQL transformations, training models, and exporting visual reports. It is designed for iterative analysis: upload data, inspect quality signals, run controlled notebook actions, approve useful outputs as new versions, and keep all artifacts on your machine.
 
