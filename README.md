@@ -40,17 +40,7 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 
 ### Roadmap & Future Feature Vision
 
-- **Market Simulation Lab (Synthetic Customer Personas)**: 
-  - *Concept*: A dedicated module deploying a multi-agent framework of simulated customer personas (e.g., 100+ parallel AI sub-agents with distinct demographics, price sensitivity, and past behavior patterns) to test product concepts, marketing copy, and feature proposals prior to launch.
-  - *Positioning*: Positioned explicitly as a **directional pre-launch signal** and qualitative discovery tool (identifying objections, segment resonance, and value-prop friction) rather than a replacement for live A/B testing on real traffic.
-  - *Architecture*: Builds naturally on Numdux's existing Model Lab and staged sandbox pipeline by running persona prompt templates in parallel and aggregating/clustering synthetic responses into structured interest distributions.
-  - *Calibration*: Designed to ingest real customer purchase distributions to ground synthetic personas, validating simulated reactions against empirical feedback.
-- **Shopify & E-Commerce Integration**: Native connectors to import live Shopify order history, catalog metrics, and customer segment profiles directly into Numdux versioned datasets.
-- **Conversion Rate Optimization (CRO) Analytics**: An experimentation module for post-launch A/B test evaluation, conversion funnel drop-off analysis, and uplift modeling integrated with live store data.
-- **Multi-Table Relational Joins**: Cross-table merging, relational DuckDB join operations, and schema linking across multiple loaded datasets.
-- **Remote Data Source Connectors**: Direct integrations for S3, Google Cloud Storage, and remote SQL databases (expanding beyond root `.numdux_data/` local storage).
-- **Advanced Container Sandboxing**: Configurable CPU/memory resource quotas and strict egress network policies for Docker sandbox execution.
-- **Multi-User Collaboration**: Real-time shared notebook state and collaborative data cleaning workflows.
+
 
 ## Stack
 
