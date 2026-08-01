@@ -50,7 +50,7 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 </p>
 
 ### Roadmap & Future Feature Vision
-
+Shopyfy ai agent conction
 
 
 ## Stack
