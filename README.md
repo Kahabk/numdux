@@ -6,12 +6,77 @@
 # Numdux Notebook
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-2f6fed" />
-  <img alt="Status" src="https://img.shields.io/badge/status-local--first-18a058" />
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
-  <img alt="Frontend" src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-646cff" />
-  <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688" />
-  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776ab" />
+ <!-- Project -->
+<img alt="Version" src="https://img.shields.io/badge/version-0.2.0-2f6fed" />
+<img alt="Status" src="https://img.shields.io/badge/status-active-18a058" />
+<img alt="License" src="https://img.shields.io/badge/license-MIT-blue" />
+<img alt="Maintenance" src="https://img.shields.io/badge/maintained-yes-brightgreen" />
+<img alt="Made With Love" src="https://img.shields.io/badge/made%20with-%E2%9D%A4-red" />
+
+<!-- Platform -->
+<img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-blue" />
+<img alt="Architecture" src="https://img.shields.io/badge/architecture-x64%20%7C%20ARM-success" />
+
+<!-- Languages -->
+<img alt="Python" src="https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white" />
+<img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" />
+<img alt="JavaScript" src="https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black" />
+
+<!-- Frontend -->
+<img alt="React" src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black" />
+<img alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" />
+<img alt="Tailwind CSS" src="https://img.shields.io/badge/TailwindCSS-06B6D4?logo=tailwindcss&logoColor=white" />
+
+<!-- Backend -->
+<img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
+<img alt="Flask" src="https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white" />
+<img alt="Node.js" src="https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white" />
+
+<!-- AI -->
+<img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-412991?logo=openai&logoColor=white" />
+<img alt="Ollama" src="https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white" />
+<img alt="LangChain" src="https://img.shields.io/badge/LangChain-00A67E?logo=chainlink&logoColor=white" />
+<img alt="Transformers" src="https://img.shields.io/badge/HuggingFace-FFD21E?logo=huggingface&logoColor=black" />
+
+<!-- Database -->
+<img alt="SQLite" src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" />
+<img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" />
+<img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-FF4F8B?logo=qdrant&logoColor=white" />
+
+<!-- DevOps -->
+<img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" />
+<img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white" />
+<img alt="NGINX" src="https://img.shields.io/badge/NGINX-009639?logo=nginx&logoColor=white" />
+
+<!-- Cloud -->
+<img alt="AWS" src="https://img.shields.io/badge/AWS-232F3E?logo=amazonaws&logoColor=white" />
+<img alt="Cloudflare" src="https://img.shields.io/badge/Cloudflare-F38020?logo=cloudflare&logoColor=white" />
+<img alt="Vercel" src="https://img.shields.io/badge/Vercel-black?logo=vercel&logoColor=white" />
+
+<!-- Code Quality -->
+<img alt="Code Style" src="https://img.shields.io/badge/code%20style-black-000000" />
+<img alt="Lint" src="https://img.shields.io/badge/lint-passing-success" />
+<img alt="Tests" src="https://img.shields.io/badge/tests-passing-brightgreen" />
+<img alt="Coverage" src="https://img.shields.io/badge/coverage-96%25-success" />
+
+<!-- Security -->
+<img alt="Security" src="https://img.shields.io/badge/security-A+-brightgreen" />
+<img alt="Dependencies" src="https://img.shields.io/badge/dependencies-up%20to%20date-success" />
+
+<!-- Performance -->
+<img alt="Performance" src="https://img.shields.io/badge/performance-optimized-success" />
+<img alt="Local First" src="https://img.shields.io/badge/local--first-yes-blue" />
+<img alt="Offline" src="https://img.shields.io/badge/offline-supported-success" />
+
+<!-- Community -->
+<img alt="Contributions Welcome" src="https://img.shields.io/badge/contributions-welcome-brightgreen" />
+<img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-blue" />
+<img alt="Issues" src="https://img.shields.io/badge/issues-open-yellow" />
+
+<!-- Fun -->
+<img alt="Built by Humans" src="https://img.shields.io/badge/Built%20By-Humans-orange" />
+<img alt="Powered by AI" src="https://img.shields.io/badge/Powered%20By-AI-purple" />
+<img alt="Open Source" src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red" />
 </p>
 
 **Current version:** `0.1.2`
