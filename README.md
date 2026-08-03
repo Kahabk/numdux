@@ -4,15 +4,7 @@
 </p>
 
 # Numdux Notebook
-<img src="https://img.shields.io/github/stars/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/forks/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/issues/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/license/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/last-commit/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/repo-size/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/languages/top/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/commit-activity/m/USERNAME/REPO?style=for-the-badge" />
-<img src="https://img.shields.io/github/contributors/USERNAME/REPO?style=for-the-badge" />
+
 
 <p>
  <!-- Project -->
