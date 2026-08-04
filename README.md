@@ -45,40 +45,7 @@
 <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-FF4F8B?logo=qdrant&logoColor=white" />
 
 <!-- DevOps -->
-<img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" />
-<img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white" />
-<img alt="NGINX" src="https://img.shields.io/badge/NGINX-009639?logo=nginx&logoColor=white" />
 
-<!-- Cloud -->
-<img alt="AWS" src="https://img.shields.io/badge/AWS-232F3E?logo=amazonaws&logoColor=white" />
-<img alt="Cloudflare" src="https://img.shields.io/badge/Cloudflare-F38020?logo=cloudflare&logoColor=white" />
-<img alt="Vercel" src="https://img.shields.io/badge/Vercel-black?logo=vercel&logoColor=white" />
-
-<!-- Code Quality -->
-<img alt="Code Style" src="https://img.shields.io/badge/code%20style-black-000000" />
-<img alt="Lint" src="https://img.shields.io/badge/lint-passing-success" />
-<img alt="Tests" src="https://img.shields.io/badge/tests-passing-brightgreen" />
-<img alt="Coverage" src="https://img.shields.io/badge/coverage-96%25-success" />
-
-<!-- Security -->
-<img alt="Security" src="https://img.shields.io/badge/security-A+-brightgreen" />
-<img alt="Dependencies" src="https://img.shields.io/badge/dependencies-up%20to%20date-success" />
-
-<!-- Performance -->
-<img alt="Performance" src="https://img.shields.io/badge/performance-optimized-success" />
-<img alt="Local First" src="https://img.shields.io/badge/local--first-yes-blue" />
-<img alt="Offline" src="https://img.shields.io/badge/offline-supported-success" />
-
-<!-- Community -->
-<img alt="Contributions Welcome" src="https://img.shields.io/badge/contributions-welcome-brightgreen" />
-<img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-blue" />
-<img alt="Issues" src="https://img.shields.io/badge/issues-open-yellow" />
-
-<!-- Fun -->
-<img alt="Built by Humans" src="https://img.shields.io/badge/Built%20By-Humans-orange" />
-<img alt="Powered by AI" src="https://img.shields.io/badge/Powered%20By-AI-purple" />
-<img alt="Open Source" src="https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red" />
-</p>
 
 **Current version:** `0.1.2`
 
