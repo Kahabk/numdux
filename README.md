@@ -10,7 +10,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
   <img alt="Frontend" src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-646cff" />
   <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688" />
-  <img alt="Python" src="https://img.shields.io/badge/python-3.11%2B-3776ab" />
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776ab" />
 </p>
 
 **Current version:** `0.2.0`
@@ -62,13 +62,13 @@ The app combines a React/Vite frontend with a FastAPI backend. Dataset processin
 
 ## Requirements
 
-- Python 3.11 or newer.
-- Node.js and npm.
+- Python 3.10 or newer.
+- Node.js and npm are optional for standard use when the pre-built frontend assets are present.
 - Docker is optional but recommended for stronger local sandbox isolation.
 
 ## Quick Start
 
-Numdux features a fully compiled frontend and FastAPI static serving, meaning **Node.js and npm are optional** for standard users. You only need Python 3.11+.
+Numdux features a fully compiled frontend and FastAPI static serving, meaning **Node.js and npm are optional** for standard users when `backend/app/dist/` is present. You only need Python 3.10+.
 
 ### 1. Easy Installation
 
@@ -99,18 +99,23 @@ Once installed, start the application from the root folder:
 
 #### On Windows:
 ```cmd
-numdux
+numdux.bat
 ```
 
-*Note: The `numdux` wrapper script will automatically locate and run inside your local virtual environment without needing to activate it manually!*
+*Note: The `numdux` and `numdux.bat` wrapper scripts automatically locate and run inside your local virtual environment without needing to activate it manually.*
 
 #### Global Command
-On Windows, the installer automatically registers Numdux in your user environment PATH. After running the installer, you can open a new command prompt or PowerShell window and launch it from **any folder** simply by running:
+On Windows, the installer adds the project folder to your user PATH when possible. After running the installer, you can open a new command prompt or PowerShell window and launch it from **any folder** with:
 ```cmd
 numdux
 ```
 
-On Linux / macOS, if you want to run `numdux` from any directory, you can add the repository directory to your `PATH` or install it globally using `pipx` or standard `pip`:
+On Linux / macOS, run the local wrapper from the project folder:
+```bash
+./numdux
+```
+
+For a global install, use `pipx` or standard `pip`:
 ```bash
 # Install globally using pipx (recommended)
 pipx install .
@@ -131,19 +136,19 @@ By default, Numdux runs at `http://127.0.0.1:8000/`.
 
 - **Disable Auto-browser Open**:
   ```bash
-  numdux --no-browser
+  ./numdux --no-browser
   ```
 - **Run in Developer Mode** (starts the hot-reloading Vite server at port 5173, requires Node.js/npm):
   ```bash
-  numdux --dev
+  ./numdux --dev
   ```
 - **Enable Backend Live Reloading**:
   ```bash
-  numdux --reload
+  ./numdux --reload
   ```
 - **Custom Ports**:
   ```bash
-  numdux --backend-port 8010
+  ./numdux --backend-port 8010
   ```
 
 ## Configuration

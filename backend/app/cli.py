@@ -9,11 +9,10 @@ import subprocess
 import sys
 import time
 import webbrowser
-from pathlib import Path
 from typing import Literal
 
+from .paths import APP_ROOT, FRONTEND_DIR
 
-ROOT = Path(__file__).resolve().parents[2]
 PortStatus = Literal["open", "closed", "unknown"]
 
 
@@ -51,7 +50,7 @@ def command_exists(command: str) -> bool:
 
 
 def start_process(command: list[str], *, env: dict[str, str] | None = None) -> subprocess.Popen[bytes]:
-    return subprocess.Popen(command, cwd=ROOT, env=env)
+    return subprocess.Popen(command, cwd=APP_ROOT, env=env)
 
 
 def terminate(processes: list[subprocess.Popen[bytes]]) -> None:
@@ -67,8 +66,7 @@ def terminate(processes: list[subprocess.Popen[bytes]]) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
-    frontend_dir = Path(__file__).resolve().parent / "dist"
-    has_compiled_frontend = frontend_dir.exists() and (frontend_dir / "index.html").exists()
+    has_compiled_frontend = FRONTEND_DIR.exists() and (FRONTEND_DIR / "index.html").exists()
     dev_mode = args.dev or not has_compiled_frontend
 
     if dev_mode:
@@ -79,9 +77,17 @@ def run(args: argparse.Namespace) -> int:
                 print("Compiled frontend not found. Attempting to start in dev mode, but npm is not installed.\n"
                       "Please build the frontend using 'npm run build' or install Node.js/npm to run in dev mode.", file=sys.stderr)
             return 1
+        if not (APP_ROOT / "package.json").exists():
+            print(
+                "Numdux dev mode needs a source checkout with package.json. "
+                "Run from the project folder or use the packaged frontend without --dev.",
+                file=sys.stderr,
+            )
+            return 1
 
     env = os.environ.copy()
     env["VITE_API_URL"] = f"http://{args.backend_host}:{args.backend_port}"
+    env.setdefault("NUMDUX_HOME", str(APP_ROOT))
 
     backend_command = [
         sys.executable,
@@ -113,6 +119,7 @@ def run(args: argparse.Namespace) -> int:
 
     try:
         print(f"Starting Numdux backend on http://{args.backend_host}:{args.backend_port}")
+        print(f"Using Numdux workspace: {APP_ROOT}")
         backend = start_process(backend_command, env=env)
         processes.append(backend)
         wait_for_port(args.backend_host, args.backend_port, backend, "backend")

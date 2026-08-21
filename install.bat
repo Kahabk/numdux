@@ -1,44 +1,45 @@
 @echo off
+setlocal EnableExtensions
 echo ===================================================
 echo       Numdux Notebook Installer for Windows
 echo ===================================================
 echo.
 
-REM 1. Check Python (try python, python3, py)
+cd /d "%~dp0"
+
 set PYTHON_CMD=
-where python >nul 2>nul
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python
-    goto python_found
-)
-
-where python3 >nul 2>nul
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python3
-    goto python_found
-)
-
 where py >nul 2>nul
 if %errorlevel% equ 0 (
-    set PYTHON_CMD=py
-    goto python_found
+    py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+    if %errorlevel% equ 0 set PYTHON_CMD=py -3
 )
 
-:python_found
 if "%PYTHON_CMD%"=="" (
-    echo [ERROR] Python was not found in your PATH.
-    echo Please install Python 3.11+ and check "Add Python to PATH" during installation.
+    where python >nul 2>nul
+    if %errorlevel% equ 0 (
+        python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+        if %errorlevel% equ 0 set PYTHON_CMD=python
+    )
+)
+
+if "%PYTHON_CMD%"=="" (
+    where python3 >nul 2>nul
+    if %errorlevel% equ 0 (
+        python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+        if %errorlevel% equ 0 set PYTHON_CMD=python3
+    )
+)
+
+if "%PYTHON_CMD%"=="" (
+    echo [ERROR] Python 3.10 or newer was not found in your PATH.
+    echo Please install Python 3.10+ and check "Add Python to PATH" during installation.
     echo Get Python at: https://www.python.org/downloads/
     goto error
 )
 
-REM Check Python version (>= 3.11)
-%PYTHON_CMD% -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [WARNING] Numdux is optimized for Python 3.11+. Your Python version might be older.
-)
+echo [INFO] Using Python:
+%PYTHON_CMD% -V
 
-REM 2. Create virtual environment if it doesn't exist
 if not exist ".venv" (
     echo [INFO] Creating Python virtual environment in .venv...
     %PYTHON_CMD% -m venv .venv
@@ -48,17 +49,19 @@ if not exist ".venv" (
     )
 )
 
-echo [INFO] Activating virtual environment...
-call .venv\Scripts\activate.bat
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to activate virtual environment.
+if not exist ".venv\Scripts\python.exe" (
+    echo [ERROR] Virtual environment Python was not found at .venv\Scripts\python.exe.
     goto error
 )
 
-echo [INFO] Upgrading pip...
-python -m pip install --upgrade pip
+set VENV_PYTHON=.venv\Scripts\python.exe
 
-REM 3. Check and build frontend if needed
+echo [INFO] Upgrading pip...
+"%VENV_PYTHON%" -m pip install --upgrade pip
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to upgrade pip.
+    goto error
+)
 set FRONTEND_BUILT=0
 if exist "backend\app\dist\index.html" (
     set FRONTEND_BUILT=1
@@ -69,8 +72,9 @@ if %errorlevel% neq 0 (
     if %FRONTEND_BUILT% equ 1 (
         echo [INFO] npm not found, but pre-built frontend assets were detected. Skipping frontend build.
     ) else (
-        echo [WARNING] npm was not found and no pre-built frontend assets exist.
-        echo Please install Node.js/npm to build the frontend, then re-run this installer.
+        echo [ERROR] npm was not found and no pre-built frontend assets exist.
+        echo Please install Node.js/npm, then re-run this installer.
+        goto error
     )
     goto skip_frontend
 )
@@ -92,17 +96,22 @@ if %errorlevel% neq 0 (
 
 :skip_frontend
 
-REM 4. Install backend dependencies and register the numdux CLI package
-echo [INFO] Installing Python dependencies and registering 'numdux' CLI...
-pip install -e .
+echo [INFO] Installing Python dependencies...
+"%VENV_PYTHON%" -m pip install -r requirements.txt
 if %errorlevel% neq 0 (
-    echo [ERROR] Python package installation failed.
+    echo [ERROR] Python dependency installation failed.
+    echo If the error mentions compiling numpy, pandas, scipy, scikit-learn, or pyarrow, upgrade Python/pip or install Python 3.11/3.12 and re-run this installer.
     goto error
 )
 
-REM 5. Register numdux globally in User PATH
+echo [INFO] Registering optional editable package entry point...
+"%VENV_PYTHON%" -m pip install --no-build-isolation -e .
+if %errorlevel% neq 0 (
+    echo [WARNING] Editable package registration failed. The local .\numdux wrapper will still work.
+)
+
 echo [INFO] Registering 'numdux' command globally in your User PATH...
-powershell -NoProfile -Command "$dir = [System.IO.Path]::GetFullPath('.'); $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); if ([string]::IsNullOrEmpty($userPath)) { [Environment]::SetEnvironmentVariable('Path', $dir, 'User'); Write-Host 'Successfully added Numdux directory to your User PATH.' } elseif ($userPath -split ';' -notcontains $dir) { [Environment]::SetEnvironmentVariable('Path', $userPath + ';' + $dir, 'User'); Write-Host 'Successfully added Numdux directory to your User PATH.' } else { Write-Host 'Numdux directory is already in your User PATH.' }" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$dir = [System.IO.Path]::GetFullPath('.'); $userPath = [Environment]::GetEnvironmentVariable('Path', 'User'); $parts = @(); if (-not [string]::IsNullOrWhiteSpace($userPath)) { $parts = $userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } }; if ($parts -notcontains $dir) { $newPath = (($parts + $dir) -join ';'); [Environment]::SetEnvironmentVariable('Path', $newPath, 'User') }" >nul 2>nul
 if %errorlevel% neq 0 (
     echo [WARNING] Could not automatically add Numdux to PATH. You can run it using '.\numdux' from the root folder.
 ) else (

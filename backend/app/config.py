@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+from .paths import ENV_FILE
 
-ROOT = Path(__file__).resolve().parents[2]
 
-
-def load_env_file(path: Path = ROOT / ".env") -> None:
+def load_env_file(path: Path = ENV_FILE) -> None:
     if not path.exists():
         return
     for raw_line in path.read_text().splitlines():
@@ -20,7 +19,8 @@ def load_env_file(path: Path = ROOT / ".env") -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
-def update_env_file(updates: Mapping[str, str], path: Path = ROOT / ".env") -> None:
+def update_env_file(updates: Mapping[str, str], path: Path = ENV_FILE) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     existing_lines = path.read_text().splitlines() if path.exists() else []
     remaining = {key: str(value) for key, value in updates.items()}
     next_lines: list[str] = []

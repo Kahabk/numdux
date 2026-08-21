@@ -4,6 +4,16 @@ venv/
 env/
 ENV/
 
+# Runtime data and local settings
+.numdux_data/
+.numdux_test/
+.env
+
+# Python packaging and tooling
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
 # Large media
 banner.gif
 *.mp4
@@ -13,3 +23,8 @@ banner.gif
 __pycache__/
 *.pyc
 *.so
+
+# Node and build artifacts
+node_modules/
+dist/
+tsconfig.tsbuildinfo

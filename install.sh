@@ -1,49 +1,57 @@
 #!/usr/bin/env bash
+set -u
 
 echo "==================================================="
-echo "       Numdux Notebook Installer for Linux"
+echo "       Numdux Notebook Installer for Linux/macOS"
 echo "==================================================="
 echo
 
-# 1. Check Python3
-if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] python3 was not found in your PATH."
-    echo "Please install Python 3.11+ using your package manager."
+cd "$(dirname "$0")"
+
+PYTHON_CMD=""
+for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >/dev/null 2>&1; then
+        PYTHON_CMD="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PYTHON_CMD" ]; then
+    echo "[ERROR] Python 3.10 or newer was not found in your PATH."
+    echo "Install Python 3.10+ and re-run this installer."
     exit 1
 fi
 
-# Check Python version (>= 3.11)
-if ! python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" &> /dev/null; then
-    echo "[WARNING] Numdux is optimized for Python 3.11+. Your Python version is $(python3 -V | cut -d' ' -f2), which is older."
-fi
+echo "[INFO] Using $($PYTHON_CMD -V)"
 
-# 2. Create virtual environment if it doesn't exist
 if [ ! -d ".venv" ]; then
     echo "[INFO] Creating Python virtual environment in .venv..."
-    python3 -m venv .venv
+    "$PYTHON_CMD" -m venv .venv
     if [ $? -ne 0 ]; then
-        echo "[ERROR] Failed to create Python virtual environment. Install python3-venv if needed."
+        echo "[ERROR] Failed to create Python virtual environment."
+        echo "On Debian/Ubuntu, install the venv package, for example: sudo apt install python3-venv"
         exit 1
     fi
 fi
 
-echo "[INFO] Activating virtual environment..."
-source .venv/bin/activate
-if [ $? -ne 0 ]; then
-    echo "[ERROR] Failed to activate virtual environment."
+VENV_PYTHON=".venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "[ERROR] Virtual environment Python was not found at $VENV_PYTHON."
     exit 1
 fi
 
 echo "[INFO] Upgrading pip..."
-python3 -m pip install --upgrade pip
-
-# 3. Check and build frontend if needed
+"$VENV_PYTHON" -m pip install --upgrade pip
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Failed to upgrade pip."
+    exit 1
+fi
 FRONTEND_BUILT=0
 if [ -f "backend/app/dist/index.html" ]; then
     FRONTEND_BUILT=1
 fi
 
-if command -v npm &> /dev/null; then
+if command -v npm >/dev/null 2>&1; then
     echo "[INFO] npm found. Installing frontend dependencies and building assets..."
     if npm install; then
         if npm run build; then
@@ -58,30 +66,37 @@ else
     if [ $FRONTEND_BUILT -eq 1 ]; then
         echo "[INFO] npm not found, but pre-built frontend assets were detected. Skipping frontend build."
     else
-        echo "[WARNING] npm was not found and no pre-built frontend assets exist."
-        echo "Please install Node.js/npm to build the frontend, then re-run this installer."
+        echo "[ERROR] npm was not found and no pre-built frontend assets exist."
+        echo "Install Node.js/npm, then re-run this installer."
+        exit 1
     fi
 fi
 
-# 4. Install backend dependencies and register the numdux CLI package
-echo "[INFO] Installing Python dependencies and registering 'numdux' CLI..."
-if pip install -e .; then
-    echo
-    echo "==================================================="
-    echo "     Numdux Notebook Installation Successful!"
-    echo "==================================================="
-    echo
-    echo "To start Numdux, activate your environment and run:"
-    echo "    source .venv/bin/activate"
-    echo "    numdux"
-    echo
-    echo "Or run directly using the wrapper:"
-    echo "    ./numdux"
-    echo
-    echo "To run in development mode (with hot-reloading Vite server):"
-    echo "    ./numdux --dev"
-    echo
-else
-    echo "[ERROR] Python package installation failed."
+echo "[INFO] Installing Python dependencies..."
+if ! "$VENV_PYTHON" -m pip install -r requirements.txt; then
+    echo "[ERROR] Python dependency installation failed."
+    echo "If the error mentions compiling numpy, pandas, scipy, scikit-learn, or pyarrow, upgrade Python/pip or install Python 3.11/3.12 and re-run this installer."
     exit 1
 fi
+
+echo "[INFO] Registering optional editable package entry point..."
+if ! "$VENV_PYTHON" -m pip install --no-build-isolation -e .; then
+    echo "[WARNING] Editable package registration failed. The local ./numdux wrapper will still work."
+fi
+
+chmod +x ./numdux >/dev/null 2>&1 || true
+echo
+echo "==================================================="
+echo "     Numdux Notebook Installation Successful!"
+echo "==================================================="
+echo
+echo "Start Numdux directly with:"
+echo "    ./numdux"
+echo
+echo "Or activate the environment first:"
+echo "    source .venv/bin/activate"
+echo "    python -m backend.app.cli"
+echo
+echo "To run in development mode (with hot-reloading Vite server):"
+echo "    ./numdux --dev"
+echo

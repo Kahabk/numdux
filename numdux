@@ -3,14 +3,18 @@ import os
 import sys
 from pathlib import Path
 
-# Automatically detect and use local virtual environment if available
 script_dir = Path(__file__).resolve().parent
-venv_python = script_dir / ".venv" / "bin" / "python3"
-if not venv_python.exists():
-    venv_python = script_dir / ".venv" / "Scripts" / "python.exe"
+os.environ.setdefault("NUMDUX_HOME", str(script_dir))
+
+venv_candidates = [
+    script_dir / ".venv" / "bin" / "python3",
+    script_dir / ".venv" / "bin" / "python",
+    script_dir / ".venv" / "Scripts" / "python.exe",
+]
+venv_python = next((path for path in venv_candidates if path.exists()), None)
 
 current_python = Path(sys.executable).resolve()
-if venv_python.exists() and current_python != venv_python.resolve():
+if venv_python and current_python != venv_python.resolve():
     os.execv(str(venv_python), [str(venv_python)] + sys.argv)
 
 from backend.app.cli import main

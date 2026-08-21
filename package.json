@@ -7,8 +7,8 @@
   },
   "type": "module",
   "scripts": {
-    "numdux": "python3 -m backend.app.cli",
-    "start": "python3 -m backend.app.cli run",
+    "numdux": "node scripts/run-python.mjs -m backend.app.cli",
+    "start": "node scripts/run-python.mjs -m backend.app.cli run",
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0"

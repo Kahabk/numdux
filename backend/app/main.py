@@ -22,10 +22,10 @@ from .safety import validate_python_code
 from .sandbox import SandboxManager
 from .store import InMemoryStore
 from .tasking import generate_task_code, infer_workflow, repair_task_code
+from .paths import FRONTEND_DIR, STORAGE_DIR
 
 
-ROOT = Path(__file__).resolve().parents[2]
-STORAGE = ROOT / ".numdux_data"
+STORAGE = STORAGE_DIR
 store = InMemoryStore(STORAGE)
 store.load_existing({"load": load_dataset, "profile": profile_dataset})
 chart_store = ChartConfigStore(STORAGE)
@@ -666,7 +666,5 @@ def create_ai_provider():
 
 
 # Serve static files for frontend in production
-FRONTEND_DIR = Path(__file__).resolve().parent / "dist"
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-
