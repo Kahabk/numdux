@@ -56,12 +56,8 @@ if not exist ".venv\Scripts\python.exe" (
 
 set VENV_PYTHON=.venv\Scripts\python.exe
 
-echo [INFO] Upgrading pip...
-"%VENV_PYTHON%" -m pip install --upgrade pip
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to upgrade pip.
-    goto error
-)
+echo [INFO] Using pip:
+"%VENV_PYTHON%" -m pip --version
 set FRONTEND_BUILT=0
 if exist "backend\app\dist\index.html" (
     set FRONTEND_BUILT=1
@@ -80,7 +76,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [INFO] npm found. Installing frontend dependencies...
-call npm install
+call npm install --no-fund --loglevel=error
 if %errorlevel% neq 0 (
     echo [WARNING] npm install failed. Running without rebuilding frontend.
     goto skip_frontend
@@ -97,17 +93,11 @@ if %errorlevel% neq 0 (
 :skip_frontend
 
 echo [INFO] Installing Python dependencies...
-"%VENV_PYTHON%" -m pip install -r requirements.txt
+"%VENV_PYTHON%" -m pip install -q --disable-pip-version-check --no-cache-dir -r requirements.txt
 if %errorlevel% neq 0 (
     echo [ERROR] Python dependency installation failed.
     echo If the error mentions compiling numpy, pandas, scipy, scikit-learn, or pyarrow, upgrade Python/pip or install Python 3.11/3.12 and re-run this installer.
     goto error
-)
-
-echo [INFO] Registering optional editable package entry point...
-"%VENV_PYTHON%" -m pip install --no-build-isolation -e .
-if %errorlevel% neq 0 (
-    echo [WARNING] Editable package registration failed. The local .\numdux wrapper will still work.
 )
 
 echo [INFO] Registering 'numdux' command globally in your User PATH...

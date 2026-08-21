@@ -14,6 +14,8 @@ from typing import Literal
 from .paths import APP_ROOT, FRONTEND_DIR
 
 PortStatus = Literal["open", "closed", "unknown"]
+DEFAULT_BACKEND_PORT = 8000
+DEFAULT_FRONTEND_PORT = 5173
 
 
 def port_status(host: str, port: int) -> PortStatus:
@@ -24,6 +26,10 @@ def port_status(host: str, port: int) -> PortStatus:
         return "unknown"
     except OSError:
         return "closed"
+
+
+def connect_host(host: str) -> str:
+    return "127.0.0.1" if host in {"0.0.0.0", "::"} else host
 
 
 def wait_for_port(host: str, port: int, process: subprocess.Popen[bytes], label: str, timeout: float = 60.0) -> None:
@@ -49,6 +55,16 @@ def command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
+def find_available_port(host: str, preferred_port: int) -> int:
+    for port in range(preferred_port, preferred_port + 100):
+        status = port_status(host, port)
+        if status == "closed":
+            return port
+        if status == "unknown":
+            return preferred_port
+    raise RuntimeError(f"No available port found on {host} from {preferred_port} to {preferred_port + 99}.")
+
+
 def start_process(command: list[str], *, env: dict[str, str] | None = None) -> subprocess.Popen[bytes]:
     return subprocess.Popen(command, cwd=APP_ROOT, env=env)
 
@@ -68,6 +84,11 @@ def terminate(processes: list[subprocess.Popen[bytes]]) -> None:
 def run(args: argparse.Namespace) -> int:
     has_compiled_frontend = FRONTEND_DIR.exists() and (FRONTEND_DIR / "index.html").exists()
     dev_mode = args.dev or not has_compiled_frontend
+    backend_probe_host = connect_host(args.backend_host)
+    backend_port = args.backend_port or find_available_port(backend_probe_host, DEFAULT_BACKEND_PORT)
+    frontend_port = args.frontend_port or DEFAULT_FRONTEND_PORT
+    if args.backend_port is None and backend_port != DEFAULT_BACKEND_PORT:
+        print(f"[INFO] Backend port {DEFAULT_BACKEND_PORT} is busy. Using {backend_port} instead.")
 
     if dev_mode:
         if not command_exists("npm"):
@@ -84,9 +105,13 @@ def run(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
+        frontend_probe_host = connect_host(args.frontend_host)
+        frontend_port = args.frontend_port or find_available_port(frontend_probe_host, DEFAULT_FRONTEND_PORT)
+        if args.frontend_port is None and frontend_port != DEFAULT_FRONTEND_PORT:
+            print(f"[INFO] Frontend port {DEFAULT_FRONTEND_PORT} is busy. Using {frontend_port} instead.")
 
     env = os.environ.copy()
-    env["VITE_API_URL"] = f"http://{args.backend_host}:{args.backend_port}"
+    env["VITE_API_URL"] = f"http://{args.backend_host}:{backend_port}"
     env.setdefault("NUMDUX_HOME", str(APP_ROOT))
 
     backend_command = [
@@ -97,7 +122,7 @@ def run(args: argparse.Namespace) -> int:
         "--host",
         args.backend_host,
         "--port",
-        str(args.backend_port),
+        str(backend_port),
     ]
 
     if args.reload:
@@ -118,11 +143,11 @@ def run(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, stop)
 
     try:
-        print(f"Starting Numdux backend on http://{args.backend_host}:{args.backend_port}")
+        print(f"Starting Numdux backend on http://{args.backend_host}:{backend_port}")
         print(f"Using Numdux workspace: {APP_ROOT}")
         backend = start_process(backend_command, env=env)
         processes.append(backend)
-        wait_for_port(args.backend_host, args.backend_port, backend, "backend")
+        wait_for_port(backend_probe_host, backend_port, backend, "backend")
 
         if dev_mode:
             frontend_command = [
@@ -133,18 +158,18 @@ def run(args: argparse.Namespace) -> int:
                 "--host",
                 args.frontend_host,
                 "--port",
-                str(args.frontend_port),
+                str(frontend_port),
                 "--strictPort",
             ]
-            print(f"Starting Numdux app on http://{args.frontend_host}:{args.frontend_port}")
+            print(f"Starting Numdux app on http://{args.frontend_host}:{frontend_port}")
             frontend = start_process(frontend_command, env=env)
             processes.append(frontend)
             browser_host = "localhost" if args.frontend_host in {"0.0.0.0", "::"} else args.frontend_host
-            url = f"http://{browser_host}:{args.frontend_port}"
-            wait_for_port(browser_host, args.frontend_port, frontend, "frontend")
+            url = f"http://{browser_host}:{frontend_port}"
+            wait_for_port(browser_host, frontend_port, frontend, "frontend")
         else:
             browser_host = "localhost" if args.backend_host in {"0.0.0.0", "::"} else args.backend_host
-            url = f"http://{browser_host}:{args.backend_port}"
+            url = f"http://{browser_host}:{backend_port}"
 
         print(f"\nNumdux is running: {url}")
         print("Press Ctrl+C to stop.")
@@ -171,9 +196,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Start the backend and frontend together.")
     run_parser.add_argument("--backend-host", default="127.0.0.1", help="Backend host. Default: 127.0.0.1")
-    run_parser.add_argument("--backend-port", type=int, default=8000, help="Backend port. Default: 8000")
+    run_parser.add_argument("--backend-port", type=int, default=None, help="Backend port. Default: first available from 8000")
     run_parser.add_argument("--frontend-host", default="0.0.0.0", help="Frontend host. Default: 0.0.0.0")
-    run_parser.add_argument("--frontend-port", type=int, default=5173, help="Frontend port. Default: 5173")
+    run_parser.add_argument("--frontend-port", type=int, default=None, help="Frontend port in dev mode. Default: first available from 5173")
     run_parser.add_argument("--no-browser", action="store_true", help="Do not open the browser automatically.")
     run_parser.add_argument("--reload", action="store_true", help="Restart the backend when Python files change.")
     run_parser.add_argument("--dev", action="store_true", help="Run in development mode (starts Vite dev server).")

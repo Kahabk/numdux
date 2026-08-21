@@ -40,12 +40,7 @@ if [ ! -x "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-echo "[INFO] Upgrading pip..."
-"$VENV_PYTHON" -m pip install --upgrade pip
-if [ $? -ne 0 ]; then
-    echo "[ERROR] Failed to upgrade pip."
-    exit 1
-fi
+echo "[INFO] Using $("$VENV_PYTHON" -m pip --version)"
 FRONTEND_BUILT=0
 if [ -f "backend/app/dist/index.html" ]; then
     FRONTEND_BUILT=1
@@ -53,7 +48,7 @@ fi
 
 if command -v npm >/dev/null 2>&1; then
     echo "[INFO] npm found. Installing frontend dependencies and building assets..."
-    if npm install; then
+    if npm install --no-fund --loglevel=error; then
         if npm run build; then
             FRONTEND_BUILT=1
         else
@@ -73,15 +68,10 @@ else
 fi
 
 echo "[INFO] Installing Python dependencies..."
-if ! "$VENV_PYTHON" -m pip install -r requirements.txt; then
+if ! "$VENV_PYTHON" -m pip install -q --disable-pip-version-check --no-cache-dir -r requirements.txt; then
     echo "[ERROR] Python dependency installation failed."
     echo "If the error mentions compiling numpy, pandas, scipy, scikit-learn, or pyarrow, upgrade Python/pip or install Python 3.11/3.12 and re-run this installer."
     exit 1
-fi
-
-echo "[INFO] Registering optional editable package entry point..."
-if ! "$VENV_PYTHON" -m pip install --no-build-isolation -e .; then
-    echo "[WARNING] Editable package registration failed. The local ./numdux wrapper will still work."
 fi
 
 chmod +x ./numdux >/dev/null 2>&1 || true
