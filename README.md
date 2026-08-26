@@ -6,6 +6,7 @@
 # Numdux Notebook
 
 <p>
+  
   <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-2f6fed" />
   <img alt="Status" src="https://img.shields.io/badge/status-local--first-18a058" />
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue" /></a>
