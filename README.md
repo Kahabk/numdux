@@ -12,7 +12,30 @@
   <img alt="Frontend" src="https://img.shields.io/badge/frontend-React%20%2B%20Vite-646cff" />
   <img alt="Backend" src="https://img.shields.io/badge/backend-FastAPI-009688" />
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776ab" />
+
 </p>
+
+ ![GitHub stars](https://img.shields.io/github/stars/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub forks](https://img.shields.io/github/forks/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub issues](https://img.shields.io/github/issues/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub pull requests](https://img.shields.io/github/issues-pr/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub license](https://img.shields.io/github/license/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub last commit](https://img.shields.io/github/last-commit/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub repo size](https://img.shields.io/github/repo-size/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub contributors](https://img.shields.io/github/contributors/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub language count](https://img.shields.io/github/languages/count/USERNAME/REPOSITORY?style=for-the-badge)
+
+![GitHub top language](https://img.shields.io/github/languages/top/USERNAME/REPOSITORY?style=for-the-badge)
+
+
 
 **Current version:** `0.1.2`(beta)
 
